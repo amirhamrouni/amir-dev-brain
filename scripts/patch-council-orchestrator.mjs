@@ -21,8 +21,8 @@ const injected = String.raw`
           },
           body: JSON.stringify({
             model,
-            temperature: 0.25,
-            max_tokens: 7000,
+            temperature: 0.2,
+            max_tokens: 1200,
             messages
           })
         });
@@ -79,7 +79,7 @@ const injected = String.raw`
       inputSchema: {
         project_slug: z.string().describe("Project slug, e.g. smart-twin-hamrouni"),
         question: z.string().optional().describe("Specific decision or topic to debate; defaults to the project's current architecture/MVP direction"),
-        rounds: z.number().int().min(1).max(3).optional().default(2),
+        rounds: z.number().int().min(1).max(3).optional().default(1),
       },
     },
     async ({ project_slug, question, rounds }) => {
@@ -98,7 +98,7 @@ const injected = String.raw`
           "STORED GPT OPINION:\n" + gptOpinion,
           "STORED GEMINI OPINION:\n" + geminiOpinion,
           "DEBATE QUESTION:\n" + topic,
-          "Rule: this is model opinion only. Never claim an Approved Decision. Amir alone approves final decisions."
+          "Rule: this is model opinion only. Never claim an Approved Decision. Amir alone approves final decisions. Keep each response concise and decision-focused."
         ].join("\n\n---\n\n");
 
         const geminiModels = ["google/gemini-2.5-pro"];
@@ -106,7 +106,7 @@ const injected = String.raw`
         const transcript: string[] = [];
 
         const g1 = await councilChat(geminiModels, [
-          { role: "system", content: "You are Gemini acting as an independent product architect and multi-agent systems reviewer in Amir's model council. Be concrete, critical, and concise. Explicitly mark Agree / Disagree / Modify." },
+          { role: "system", content: "You are Gemini acting as an independent product architect and multi-agent systems reviewer in Amir's model council. Be concrete, critical, concise, and explicitly mark Agree / Disagree / Modify." },
           { role: "user", content: baseContext + "\n\nRound 1: critique the stored GPT opinion and your prior opinion. Identify the strongest architecture for the requested topic." }
         ]);
         transcript.push("## Gemini Round 1 (" + g1.model + ")\n" + g1.text);
@@ -114,13 +114,13 @@ const injected = String.raw`
         let previous = g1.text;
         for (let i = 1; i <= rounds; i++) {
           const o = await councilChat(openaiModels, [
-            { role: "system", content: "You are the OpenAI side of Amir's technical model council. Defend good ideas, concede valid criticism, and improve the architecture. Do not pretend to be the interactive ChatGPT session; you are an API council model." },
-            { role: "user", content: baseContext + "\n\nGemini's latest critique:\n" + previous + "\n\nRespond point-by-point and propose any modifications. This is council round " + i + "." }
+            { role: "system", content: "You are the OpenAI side of Amir's technical model council. Defend good ideas, concede valid criticism, and improve the architecture. Be concise. Do not pretend to be the interactive ChatGPT session; you are an API council model." },
+            { role: "user", content: baseContext + "\n\nGemini's latest critique:\n" + previous + "\n\nRespond point-by-point and propose modifications. Council round " + i + "." }
           ]);
           transcript.push("## OpenAI Round " + i + " (" + o.model + ")\n" + o.text);
           if (i < rounds) {
             const g = await councilChat(geminiModels, [
-              { role: "system", content: "You are Gemini in Amir's model council. Review the OpenAI response, concede correct points, challenge remaining weaknesses, and narrow toward a unified recommendation." },
+              { role: "system", content: "You are Gemini in Amir's model council. Review the OpenAI response, concede correct points, challenge remaining weaknesses, and narrow toward a unified recommendation. Be concise." },
               { role: "user", content: baseContext + "\n\nOpenAI response:\n" + o.text + "\n\nContinue the debate. Do not create an approved decision." }
             ]);
             transcript.push("## Gemini Round " + (i + 1) + " (" + g.model + ")\n" + g.text);
