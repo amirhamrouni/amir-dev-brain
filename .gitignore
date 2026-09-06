@@ -1,0 +1,12 @@
+# Local secrets / MCP credentials
+.env
+.env.*
+!.env.example
+
+# Local Claude/Codex state
+.claude/settings.local.json
+.codex/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
