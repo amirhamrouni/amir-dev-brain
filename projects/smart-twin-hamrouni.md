@@ -3,9 +3,9 @@
 - Project: توأمي الذكي حمروني
 - Working English name: Smart Twin Hamrouni
 - Brain status: `planned`
-- Phase: discovery / discussion only
+- Phase: architecture approved / implementation next
 - Repository: not created yet
-- Important: no architecture, stack, provider, publishing method, automation policy, or product decision in this file is approved yet unless later promoted to `decisions/APPROVED_DECISIONS.md` by Amir.
+- Authoritative decision: `ST-001` in `decisions/APPROVED_DECISIONS.md`
 
 ## Core vision
 A standalone intelligent social-content operating system made of specialized agents that can research trends, generate human-style content, create images and short videos, prepare platform-specific posts, and schedule/publish to social platforms after Amir defines the account settings, categories, tone, constraints, and approval rules.
@@ -28,141 +28,140 @@ Target platforms currently discussed:
   - hashtags / metadata where useful
 - Amir wants to configure categories, account settings, style, publishing preferences, and related controls himself.
 - Scheduling and multi-platform publishing are part of the intended product.
-- The system should be creative and proactive, but final product/architecture decisions are still under discussion.
+- The system should be creative and proactive.
 
-## Initial agent-system ideas — discussion only
-These are model ideas, not approved decisions:
+## Approved V1 architecture — ST-001
+Amir explicitly approved the first Council architecture direction on 2026-09-07.
 
-1. Trend Scout Agent
-   - watches relevant trends, platform signals, topics, hooks, formats and competitor patterns.
-   - scores trend relevance against the account niche instead of chasing every viral topic.
+### Platform architecture
+- **Cloud-native operational backend + rich web client.**
+- Browser/laptop is the primary control surface, but scheduled publishing, durable state, retries, analytics and background execution must not depend on Amir's laptop remaining online.
 
-2. Content Strategist Agent
-   - turns trend signals + niche + account goals into a content plan.
-   - balances trend-driven, evergreen, educational, entertainment and conversion-oriented content.
+### Workflow architecture
+Keep specialized roles at the product/domain level, while V1 runs as one explicit workflow with three phases:
 
-3. Human Voice / Brand Twin Agent
-   - learns approved examples, tone, vocabulary, rhythm, preferred claims, banned phrases and audience style.
-   - rewrites outputs to avoid generic AI phrasing and excessive repetition.
+1. **Strategy**
+   - trend/source ingestion
+   - source/provenance validation
+   - relevance/freshness scoring
+   - ranked `ContentBriefs`
 
-4. Visual Director Agent
-   - chooses whether a post should be image, carousel, short video, talking-head style, motion graphic, meme-like format, etc.
-   - creates prompts/storyboards for visual generation.
+2. **Creation**
+   - selected brief -> copy
+   - Facebook/Instagram platform variants
+   - image generation
+   - quality/originality/repetition checks
+   - final `ContentDraft`
 
-5. Image Generation Agent
-   - produces images and variations aligned with the brand and content category.
+3. **Operations**
+   - approval queue
+   - scheduling
+   - official publishing
+   - retries/idempotency/reconciliation
+   - publish-result capture
+   - basic performance learning
 
-6. Short Video Agent
-   - produces short video concepts/scripts/storyboards and coordinates generation/editing/captions/audio where supported.
+### Orchestration policy
+- Business/domain services depend on a small internal capability interface such as:
+  - `dispatchDurableJob(name, payload, options)`
+- The interface must expose the capabilities actually required by the product: durable state, retries, idempotency, scheduling, dead-letter/error handling, reconciliation and observable execution history.
+- **Inngest is the preferred initial V1 driver** when it integrates cleanly.
+- Inngest must remain behind the internal orchestration abstraction; Strategy/Creation/Operations business logic must not call vendor-specific APIs directly.
+- This preserves the ability to replace Inngest later with Temporal or another driver without rewriting business logic.
+- Do not introduce Temporal in V1 without evidence that actual workflow complexity/scale justifies it.
+- Do not build a custom Redis/BullMQ workflow platform merely to reproduce the same infrastructure capabilities.
 
-7. Platform Adaptation Agent
-   - adapts one core idea separately for Facebook, Instagram and TikTok instead of cross-posting identical content blindly.
+### V1 scope
+Approved narrow first scope:
+- one niche
+- one Facebook/Instagram account pair where API permissions allow
+- text + image generation
+- one automated trend source + manual trend input
+- full Strategy -> Creation -> Operations vertical slice
+- web approval queue: edit / approve / reject
+- official platform publishing
+- publish-result tracking
+- basic analytics
 
-8. Quality / Safety / Originality Agent
-   - checks factual claims, duplication, spamminess, awkward AI style, platform-fit and basic policy risk before approval/publishing.
+Deferred from V1:
+- TikTok
+- video generation
+- broad autonomous publishing
+- comments/DM automation
+- advanced competitor scraping
+- multi-user SaaS complexity
+- broad multi-account scale
+- large custom analytics/ML platform
 
-9. Scheduler / Publisher Agent
-   - schedules approved content and sends it through supported platform APIs/connectors.
-   - records success/failure/retry state.
+### Governance and safety
+- Human approval is a hard V1 state boundary; content cannot be published before approval.
+- Keep the **Product Content Brain** separate from **Amir Dev Brain**.
+- Trend signals must retain provenance: source, observed time, locale/region where relevant, confidence and expiration.
+- Publishing must use durable state, idempotency, retries, uncertain-outcome reconciliation, rate-limit handling and an immutable audit trail.
 
-10. Performance Learning Agent
-   - learns from reach, watch time, engagement, saves, shares, comments, click-through and posting-time performance.
-   - feeds results back into future content strategy without changing Amir-approved brand constraints silently.
-
-## Human approval modes — discussion only
-Possible operating modes to evaluate later:
-- Draft only: agents prepare content; Amir publishes manually.
-- Approval queue: agents prepare and schedule; Amir approves each item before publishing.
-- Trusted auto-publish: only pre-approved categories/formats can publish automatically.
-- Mixed mode: sensitive/high-value posts require approval; routine content can auto-publish.
-
-## Creative product ideas to evaluate
-- Content DNA: structured brand profile for tone, audience, hooks, visual identity, banned styles, CTA preferences and niche knowledge.
-- Trend Fit Score: not just “viral”, but fit × freshness × audience relevance × production feasibility.
-- Anti-AI Repetition Memory: detect repeated hooks, sentence patterns, visuals, CTAs and topics across recent posts.
-- Multi-variant competition: agents generate 3–5 hooks/concepts; a critic/ranker chooses the strongest before Amir sees it.
-- Content Series Engine: recurring human-feeling series rather than isolated random posts.
-- Platform-native rewrite: separate TikTok hook, Instagram caption and Facebook framing for the same idea.
-- Learning loop: performance analytics influence future proposals, but never overwrite approved constraints automatically.
-- Calendar intelligence: avoid topic clustering, repetitive formats and overposting.
-- Trend expiration: automatically discard or downgrade stale trend ideas before they reach the queue.
-
-## First autonomous AI Council run — model opinion only
+## First autonomous AI Council run — historical evidence
 - Date: 2026-09-07
 - Topic: `v1-architecture-and-pipeline`
 - Execution: production E2E through `amir_council_debate`
 - Models observed in the run:
   - Gemini: `google/gemini-2.5-pro`
   - OpenAI: `openai/gpt-5.6-luna-pro`
-- Persistence: saved to Open Brain thought `702e9ed1-02bf-4b43-ad3d-4ad8525dd021`
-- Status: council recommendation only; not approved.
+- Persistence: Open Brain thought `702e9ed1-02bf-4b43-ad3d-4ad8525dd021`
+- Result: Council recommendation was reviewed by Amir. The refined capability-based orchestration approach with Inngest as initial driver was explicitly approved and promoted to `ST-001`.
 
-### Council consensus
-- Use a **cloud-native operational backend with a rich web client**. The laptop/browser is the main control surface, but scheduled publishing and durable state must not depend on Amir's machine being online.
-- Keep the specialized-agent concept, but implement V1 as **one orchestrated workflow** with explicit typed internal stages rather than many autonomous distributed agents.
-- Group the product-level workflow into three phases:
-  1. **Strategy** — trend/source ingestion -> validation/scoring -> ranked `ContentBriefs`.
-  2. **Creation** — brief -> copy/platform variants/media -> quality/originality checks -> `ContentDraft`.
-  3. **Operations** — approval -> scheduling -> publishing -> reconciliation -> performance learning.
-- Keep the **Product Content Brain** separate from **Amir Dev Brain**.
-- Use provider abstractions for LLM/image/video integrations, but keep V1 interfaces narrow rather than building a broad plug-in ecosystem prematurely.
-- Human approval is mandatory in V1. Approval is a hard state boundary before content can become publishable.
-- Publishing must use durable state, idempotency, retries, reconciliation for uncertain API outcomes, rate-limit handling, and an immutable audit trail.
-- Trend signals must carry provenance such as source, observation time, region/language, confidence and expiration; LLMs must not invent trend evidence.
+## Initial agent-system ideas — product roles
+These remain useful role boundaries inside the approved workflow; they do not imply separate distributed agent services in V1.
 
-### Recommended MVP from council
-- One niche.
-- One Facebook/Instagram account pair where API permissions allow.
-- Copy + image generation first.
-- One automated trend source plus manual trend input.
-- Full Strategy -> Creation -> Operations vertical slice.
-- Web approval queue for edit / approve / reject.
-- Official platform publishing where eligible.
-- Publish-result capture + basic performance metrics.
-- Defer TikTok/video generation, autonomous publishing, multi-user/multi-account scale, comments and DMs.
+1. Trend Scout
+2. Content Strategist
+3. Human Voice / Brand Twin
+4. Visual Director
+5. Image Generation
+6. Short Video — deferred for V1
+7. Platform Adaptation
+8. Quality / Safety / Originality
+9. Scheduler / Publisher
+10. Performance Learning
 
-### Main unresolved issue
-The remaining architectural disagreement is **workflow orchestration technology**:
-- Gemini prefers adopting a dedicated durable workflow engine such as Inngest or Temporal from the start.
-- OpenAI recommends a capability-based decision: use the simplest reliable durable workflow implementation that already provides job persistence, retries, idempotency, scheduling, dead-letter/error handling and observable history, then adopt a heavier engine when actual workflow complexity justifies it.
-- Both reject naive cron + database flags as insufficient.
+## Creative product ideas to evaluate after the vertical slice
+- Content DNA / Content Genome
+- Trend Fit Score
+- Anti-AI Repetition Memory
+- Multi-variant competition
+- Content Series Engine
+- Platform-native rewrite
+- Performance learning without silently changing fixed brand constraints
+- Calendar intelligence
+- Trend expiration
 
 ## Decision process for this project
-Before major architecture/product decisions:
-1. Gather at least three independent model opinions when useful (e.g. ChatGPT, Claude, Gemini; Codex may replace one when the decision is strongly technical).
-2. Keep each result labeled as `model opinion`.
-3. Compare trade-offs: product value, reliability, platform restrictions, cost, complexity, maintainability, automation risk, content quality and scalability.
-4. Present Amir with the recommended option and alternatives.
-5. Only Amir's explicit approval promotes a choice to an authoritative decision.
+Before future major architecture/product decisions:
+1. Gather independent model opinions when useful.
+2. Keep Council results labeled as model opinions/recommendations.
+3. Compare product value, reliability, platform restrictions, cost, complexity, maintainability, automation risk, content quality and scalability.
+4. Only Amir's explicit approval promotes a choice to an authoritative decision.
 
 ## Mandatory Council write-back rule
 When Claude, Gemini, ChatGPT, Codex, or another connected model is asked for a Council opinion about this project, the model MUST persist its completed opinion before ending the response.
 
 Required behavior:
-1. Use the Amir Dev Brain / Open Brain `capture_thought` tool after forming the opinion.
-2. Store the opinion as a model opinion, never as an approved decision.
-3. Use a topic/tag that clearly identifies both the project and model, for example:
-   - `smart-twin-hamrouni:council:claude`
-   - `smart-twin-hamrouni:council:gemini`
-   - `smart-twin-hamrouni:council:chatgpt`
-   - `smart-twin-hamrouni:council:codex`
-4. The stored thought should include: model name, date, architecture proposal, MVP scope, recommended stack, main trade-offs, risks, first implementation steps, and what should be deferred.
-5. After capture, verify persistence with `search_thoughts` or `list_thoughts` before claiming the opinion was saved.
-6. If persistence fails, report the exact tool failure; do not claim success.
-7. Do not ask Amir to copy/paste the opinion into another system. The connected model is responsible for its own write-back.
+1. Use Amir Dev Brain/Open Brain persistence after forming the opinion.
+2. Store it as model opinion/council recommendation, never as an approved decision.
+3. Identify project + model clearly.
+4. Include architecture proposal, MVP scope, stack, trade-offs, risks, first steps and deferred items.
+5. Verify persistence before claiming success.
+6. If persistence fails, report the exact failure.
+7. Never ask Amir to manually copy/paste Council opinions between systems.
 
-This write-back rule is part of project workflow, not an architectural/product decision.
-
-## Open questions for later discussion
-- Intended user scope: Amir only vs future multi-user product.
-- Number/type of social accounts and pages.
-- Languages and audience regions.
-- Niches/categories to support first.
-- Desired approval/autonomy level.
-- Image/video generation providers and cost ceiling.
-- Whether the system should respond to comments/messages in a later phase.
-- Analytics depth and optimization objectives.
-- Official API eligibility/permissions for each platform.
+## Open implementation questions
+These are implementation details to resolve without changing ST-001 unless they materially alter architecture:
+- exact first niche
+- first automated trend-source adapter
+- Meta app/API permission state for the Facebook/Instagram account pair
+- initial image-generation provider
+- hosting/runtime choice for web/backend
+- database/object-storage implementation details
+- exact internal orchestration interface contract and Inngest adapter
 
 ## Current next step
-Review the first autonomous Council recommendation with Amir. Do not promote it to an Approved Decision until Amir explicitly approves the architecture direction and the unresolved workflow-engine policy.
+Architecture discussion is closed for V1 under `ST-001`. Start implementation by creating the Smart Twin repository and establishing the first end-to-end vertical slice and core contracts before expanding features.
