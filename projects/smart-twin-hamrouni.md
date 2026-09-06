@@ -87,6 +87,46 @@ Possible operating modes to evaluate later:
 - Calendar intelligence: avoid topic clustering, repetitive formats and overposting.
 - Trend expiration: automatically discard or downgrade stale trend ideas before they reach the queue.
 
+## First autonomous AI Council run — model opinion only
+- Date: 2026-09-07
+- Topic: `v1-architecture-and-pipeline`
+- Execution: production E2E through `amir_council_debate`
+- Models observed in the run:
+  - Gemini: `google/gemini-2.5-pro`
+  - OpenAI: `openai/gpt-5.6-luna-pro`
+- Persistence: saved to Open Brain thought `702e9ed1-02bf-4b43-ad3d-4ad8525dd021`
+- Status: council recommendation only; not approved.
+
+### Council consensus
+- Use a **cloud-native operational backend with a rich web client**. The laptop/browser is the main control surface, but scheduled publishing and durable state must not depend on Amir's machine being online.
+- Keep the specialized-agent concept, but implement V1 as **one orchestrated workflow** with explicit typed internal stages rather than many autonomous distributed agents.
+- Group the product-level workflow into three phases:
+  1. **Strategy** — trend/source ingestion -> validation/scoring -> ranked `ContentBriefs`.
+  2. **Creation** — brief -> copy/platform variants/media -> quality/originality checks -> `ContentDraft`.
+  3. **Operations** — approval -> scheduling -> publishing -> reconciliation -> performance learning.
+- Keep the **Product Content Brain** separate from **Amir Dev Brain**.
+- Use provider abstractions for LLM/image/video integrations, but keep V1 interfaces narrow rather than building a broad plug-in ecosystem prematurely.
+- Human approval is mandatory in V1. Approval is a hard state boundary before content can become publishable.
+- Publishing must use durable state, idempotency, retries, reconciliation for uncertain API outcomes, rate-limit handling, and an immutable audit trail.
+- Trend signals must carry provenance such as source, observation time, region/language, confidence and expiration; LLMs must not invent trend evidence.
+
+### Recommended MVP from council
+- One niche.
+- One Facebook/Instagram account pair where API permissions allow.
+- Copy + image generation first.
+- One automated trend source plus manual trend input.
+- Full Strategy -> Creation -> Operations vertical slice.
+- Web approval queue for edit / approve / reject.
+- Official platform publishing where eligible.
+- Publish-result capture + basic performance metrics.
+- Defer TikTok/video generation, autonomous publishing, multi-user/multi-account scale, comments and DMs.
+
+### Main unresolved issue
+The remaining architectural disagreement is **workflow orchestration technology**:
+- Gemini prefers adopting a dedicated durable workflow engine such as Inngest or Temporal from the start.
+- OpenAI recommends a capability-based decision: use the simplest reliable durable workflow implementation that already provides job persistence, retries, idempotency, scheduling, dead-letter/error handling and observable history, then adopt a heavier engine when actual workflow complexity justifies it.
+- Both reject naive cron + database flags as insufficient.
+
 ## Decision process for this project
 Before major architecture/product decisions:
 1. Gather at least three independent model opinions when useful (e.g. ChatGPT, Claude, Gemini; Codex may replace one when the decision is strongly technical).
@@ -125,4 +165,4 @@ This write-back rule is part of project workflow, not an architectural/product d
 - Official API eligibility/permissions for each platform.
 
 ## Current next step
-Continue product ideation only. Do not start implementation or lock architecture until Amir asks for the three-opinion comparison and approves the resulting direction.
+Review the first autonomous Council recommendation with Amir. Do not promote it to an Approved Decision until Amir explicitly approves the architecture direction and the unresolved workflow-engine policy.
