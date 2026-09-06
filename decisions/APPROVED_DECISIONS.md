@@ -52,6 +52,12 @@ Only decisions explicitly approved by Amir belong here. Model suggestions are no
 - Decision: External infrastructure such as the deployed OB1 MCP server must be pinned to a known upstream commit/version rather than pulled from a mutable `main` branch during deployment. Upgrades must be deliberate and reviewable.
 - Authority: Amir
 
+### AD-009 — Chrome DevTools MCP is the preferred web runtime verification gate
+- Status: approved
+- Scope: web applications and web-facing releases
+- Decision: When the active coding environment supports it, use the official Google `ChromeDevTools/chrome-devtools-mcp` as the preferred browser-level verification tool after implementation and before declaring user-visible frontend work complete. Verify the real user flow and inspect relevant console, network, DOM/runtime state, screenshots and performance traces where appropriate. Browser evidence complements rather than replaces tests, CI, GitHub state and deployment verification. If the MCP is unavailable in the current host, the agent must say so and use the strongest available runtime/browser verification method instead of fabricating evidence.
+- Authority: Amir
+
 ## Project decisions
 
 ### English Twin
