@@ -1,25 +1,28 @@
 # Claude Instructions — Amir Dev Brain
 
-You are working inside Amir Hamrouni's shared development brain.
+This repository is Amir Hamrouni's shared development brain.
 
-## Mandatory read order before project work
-1. Read `PROJECTS.md`.
-2. Read `protocol/DEVELOPMENT_SYSTEM.md`.
-3. Read the matching file under `projects/`.
-4. Read applicable entries in `decisions/APPROVED_DECISIONS.md`.
-5. Inspect the actual target GitHub repository before assuming current state.
+Automatically load these governed context files:
 
-## Operating rules
-- Continue from the existing implementation and approved decisions; do not restart from scratch unless Amir explicitly asks.
-- Apply ECC-style engineering discipline: inspect/context → plan → implement → review → test/build → resolve failures → verify CI/release/deployment.
-- GitHub is authoritative for code, commits, CI, releases and deployment history.
-- Never invent current project status. Historical notes must be verified before being reported as current.
-- Use the status vocabulary from `protocol/DEVELOPMENT_SYSTEM.md`.
-- Keep Claude recommendations as model opinions unless Amir explicitly approves them.
-- If recording a Claude recommendation, place it in `council/claude-opinions.md`; do not write it into Approved Decisions without Amir approval.
-- Never commit secrets, API keys or private credentials.
+@PROJECTS.md
+@AI_CONTEXT.md
+@protocol/DEVELOPMENT_SYSTEM.md
+@decisions/APPROVED_DECISIONS.md
 
-## After material milestones
-When a commit, CI result, deployment, completed module, architecture decision or blocker is materially verified, update the relevant `projects/*.md` record and, if necessary, `PROJECTS.md`.
+## Mandatory operating order
+1. Recover context from the imported Amir Dev Brain files.
+2. Identify the target project.
+3. Inspect the actual target GitHub repository using a GitHub connector/MCP or direct repository tools; do not use web search as the primary repository reader.
+4. Verify current branch, latest commit, CI/actions and deployment/release state before claiming anything is current.
+5. Continue from the existing implementation and Amir-approved decisions. Do not restart from scratch unless Amir explicitly asks.
+6. Apply ECC-style engineering discipline: inspect, plan, implement, review, test, resolve failures, verify, then write back a compact verified milestone.
+7. Keep model opinions separate from Amir-approved decisions.
+8. Never commit secrets, API keys or private credentials.
 
-If Amir asks what you know about his projects, summarize from the registry + per-project files, and clearly distinguish `verified-current`, historical context, planned work and unknown state.
+## Memory rule
+Open Brain / OB1 is the shared cross-model episodic memory layer. GitHub remains the source of truth for code and current implementation state. Recalled memory is context, not proof of current repository state.
+
+## Access fallback
+If a nested project-memory file cannot be read because of connector, robots or indexing limitations, do not infer that it does not exist. Use `AI_CONTEXT.md` and the root registry as fallback, then verify the target project directly from its repository.
+
+If Amir asks what you know about his projects, distinguish clearly between approved decisions, historical verified checkpoints, historical/unverified context, and facts verified in the current session.
