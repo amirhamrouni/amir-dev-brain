@@ -8,6 +8,7 @@ on:
       - ".github/workflows/deploy-open-brain-mcp.yml"
       - "scripts/patch-open-brain.mjs"
       - "scripts/patch-council-orchestrator.mjs"
+      - "scripts/patch-council-reasoning.mjs"
       - "supabase/**"
 
 permissions:
@@ -47,6 +48,9 @@ jobs:
       - name: Add autonomous AI council orchestrator
         run: node scripts/patch-council-orchestrator.mjs supabase/functions/open-brain-mcp/index.ts
 
+      - name: Constrain council reasoning budget
+        run: node scripts/patch-council-reasoning.mjs supabase/functions/open-brain-mcp/index.ts
+
       - name: Normalize generated TypeScript
         shell: bash
         run: |
@@ -67,6 +71,7 @@ jobs:
           grep -q 'github_repo_state' supabase/functions/open-brain-mcp/index.ts
           grep -q 'github_fetch_file' supabase/functions/open-brain-mcp/index.ts
           grep -q 'amir_council_debate' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'reasoning: { max_tokens: 200, exclude: true }' supabase/functions/open-brain-mcp/index.ts
           if grep -q '\\`' supabase/functions/open-brain-mcp/index.ts; then
             echo 'Escaped backticks remain in generated TypeScript'
             exit 1
