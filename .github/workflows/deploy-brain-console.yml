@@ -1,0 +1,49 @@
+name: Deploy Amir Brain Console
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-brain-console.yml"
+      - "supabase/functions/brain-console/**"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy brain-console
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          supabase functions deploy brain-console \
+            --project-ref hdcpvwsndxxflbednvsq \
+            --no-verify-jwt \
+            --debug
+
+      - name: Smoke test console
+        run: |
+          set -euo pipefail
+          URL="https://hdcpvwsndxxflbednvsq.supabase.co/functions/v1/brain-console"
+          for i in 1 2 3 4 5; do
+            BODY=$(curl --silent --show-error --location "$URL" || true)
+            if echo "$BODY" | grep -q "Amir Brain Console"; then
+              echo "Brain Console smoke test passed."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Brain Console smoke test failed."
+          exit 1
