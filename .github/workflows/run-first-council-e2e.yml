@@ -1,0 +1,86 @@
+name: Run First Autonomous Council E2E
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/run-first-council-e2e.yml"
+      - "supabase/functions/council-e2e-runner/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  council-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Generate one-shot runner token
+        id: token
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKEN=$(openssl rand -hex 32)
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+          echo "::add-mask::$TOKEN"
+
+      - name: Set temporary runner secret
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          RUNNER_TOKEN: ${{ steps.token.outputs.token }}
+        run: |
+          supabase secrets set COUNCIL_RUNNER_TOKEN="$RUNNER_TOKEN" --project-ref hdcpvwsndxxflbednvsq
+
+      - name: Deploy one-shot E2E runner
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase functions deploy council-e2e-runner \
+            --project-ref hdcpvwsndxxflbednvsq \
+            --no-verify-jwt \
+            --use-api
+
+      - name: Run Smart Twin council E2E
+        env:
+          RUNNER_TOKEN: ${{ steps.token.outputs.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESPONSE=$(curl --fail-with-body --silent --show-error \
+            --request POST \
+            'https://hdcpvwsndxxflbednvsq.supabase.co/functions/v1/council-e2e-runner' \
+            --header "x-runner-token: $RUNNER_TOKEN" \
+            --header 'content-type: application/json' \
+            --data '{"project_slug":"smart-twin-hamrouni","question":"v1-architecture-and-pipeline","rounds":2}')
+          printf '%s\n' "$RESPONSE" > council-e2e-result.json
+          python - <<'PY'
+          import json
+          p='council-e2e-result.json'
+          data=json.load(open(p))
+          if not data.get('ok'):
+              raise SystemExit('Council runner returned failure: '+str(data))
+          print('Council E2E completed successfully')
+          print(json.dumps(data, ensure_ascii=False)[:12000])
+          PY
+
+      - name: Upload council result artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: first-council-e2e-result
+          path: council-e2e-result.json
+          if-no-files-found: error
+
+      - name: Remove temporary runner secret
+        if: always()
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase secrets unset COUNCIL_RUNNER_TOKEN --project-ref hdcpvwsndxxflbednvsq || true
