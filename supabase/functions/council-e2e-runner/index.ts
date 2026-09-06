@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const projectSlug = body.project_slug || "smart-twin-hamrouni";
     const question = body.question || "v1-architecture-and-pipeline";
-    const rounds = Number.isInteger(body.rounds) ? body.rounds : 2;
+    const rounds = Number.isInteger(body.rounds) ? body.rounds : 1;
 
     const transport = new StreamableHTTPClientTransport(new URL(MCP_URL), {
       requestInit: {
@@ -48,6 +48,13 @@ Deno.serve(async (req) => {
       },
     });
     await client.close();
+
+    if ((result as any)?.isError) {
+      return new Response(JSON.stringify({ ok: false, result }), {
+        status: 502,
+        headers: { "content-type": "application/json" },
+      });
+    }
 
     return new Response(JSON.stringify({ ok: true, result }), {
       status: 200,
