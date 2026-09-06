@@ -40,6 +40,18 @@ Only decisions explicitly approved by Amir belong here. Model suggestions are no
 - Decision: API keys, tokens, passwords and private credentials must never be committed to GitHub.
 - Authority: Amir
 
+### AD-007 — One canonical memory layer; direct repository tools for live state
+- Status: approved
+- Scope: all projects and AI development agents
+- Decision: OB1/Open Brain on Supabase is the canonical cross-model episodic memory layer. Do not add a second persistent agent-memory backend such as shared-agent-memory or AgentMemory unless Amir explicitly revises this decision. GitHub remains authoritative for live implementation state, and agents should access repositories through GitHub connector/MCP/direct repository tools rather than web search whenever available. ECC is the engineering workflow layer, not a competing source of truth.
+- Authority: Amir
+
+### AD-008 — Pin external agent infrastructure dependencies
+- Status: approved
+- Scope: Amir Dev Brain infrastructure
+- Decision: External infrastructure such as the deployed OB1 MCP server must be pinned to a known upstream commit/version rather than pulled from a mutable `main` branch during deployment. Upgrades must be deliberate and reviewable.
+- Authority: Amir
+
 ## Project decisions
 
 ### English Twin
