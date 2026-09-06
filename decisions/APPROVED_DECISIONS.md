@@ -67,5 +67,26 @@ Only decisions explicitly approved by Amir belong here. Model suggestions are no
 - Child-facing content should be Dutch-first, with Arabic support for Amir as a teaching aid where appropriate.
 - Pedagogy should be progressive, simple, visual, interactive and age-appropriate rather than generic AI-generated lessons.
 
+### Smart Twin Hamrouni
+
+#### ST-001 — V1 architecture, scope and orchestration policy
+- Status: approved
+- Scope: Smart Twin Hamrouni V1
+- Authority: Amir
+- Decision date: 2026-09-07
+- Decision:
+  - Use a **cloud-native operational backend with a rich web client**. The browser/laptop is the control surface, but scheduling, durable state, publishing and analytics must continue independently of Amir's machine being online.
+  - Keep the product conceptually composed of specialized agent roles, but implement V1 as **one explicit orchestrated workflow** grouped into three stages: **Strategy -> Creation -> Operations**.
+  - Keep the **Product Content Brain** separate from **Amir Dev Brain**. Product content memory/analytics belong to the Smart Twin application; Amir Dev Brain remains development/project/governance memory.
+  - V1 scope is intentionally narrow: **one niche, Facebook + Instagram, text + image, one automated trend source plus manual input, approval queue, official publishing, publish-result capture and basic analytics**. TikTok, video generation, autonomous publishing, comments/DM automation and broad multi-user/multi-account scale are deferred.
+  - Human approval is a hard state boundary in V1. Content cannot become publishable before approval.
+  - Publishing/workflow execution must provide durable state, retries, idempotency, scheduling, dead-letter/error handling, reconciliation for uncertain API outcomes, observable execution history and an immutable audit trail.
+  - Implement orchestration behind a small **capability-based service interface** such as `dispatchDurableJob(name, payload, options)`. Business logic in Strategy, Creation and Operations must depend on this internal interface rather than directly on a specific workflow vendor.
+  - Use **Inngest as the preferred initial orchestration driver for V1** when it fits cleanly, because it provides durable jobs, retries, schedules/cron and idempotency without requiring heavy self-managed infrastructure.
+  - Avoid vendor lock-in: the Inngest implementation must sit behind the internal orchestration interface so it can later be replaced by Temporal or another driver without rewriting domain/business logic.
+  - Do **not** introduce Temporal in V1 unless actual workflow complexity, throughput or operational requirements justify it.
+  - Do **not** build a custom Redis/BullMQ workflow platform merely to reproduce capabilities already provided by the chosen driver.
+- Evidence basis: first autonomous Amir AI Council E2E for `v1-architecture-and-pipeline`, Open Brain thought `702e9ed1-02bf-4b43-ad3d-4ad8525dd021`, followed by Amir's explicit approval of the capability-based Inngest formulation.
+
 ## Maintenance
 When Amir explicitly approves a new decision, append it here with a stable ID. If a decision is later changed, mark the older entry `superseded` and link the replacement rather than deleting history.
