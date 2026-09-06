@@ -54,6 +54,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Final E2E pass after constraining model reasoning/output budget.
           RESPONSE=$(curl --fail-with-body --silent --show-error \
             --request POST \
             'https://hdcpvwsndxxflbednvsq.supabase.co/functions/v1/council-e2e-runner' \
