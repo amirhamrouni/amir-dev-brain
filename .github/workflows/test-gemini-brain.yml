@@ -1,0 +1,37 @@
+name: Test Gemini Brain
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/test-gemini-brain.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Gemini Brain
+        env:
+          MCP_ACCESS_KEY: ${{ secrets.MCP_ACCESS_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${MCP_ACCESS_KEY:-}" ]; then
+            echo "Missing GitHub Actions secret: MCP_ACCESS_KEY"
+            exit 1
+          fi
+
+          RESPONSE=$(curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "content-type: application/json" \
+            -H "x-amir-key: ${MCP_ACCESS_KEY}" \
+            -d '{"project_key":"amir-dev-brain","question":"What is Amir Dev Brain and what should be the next technical step?"}' \
+            "https://hdcpvwsndxxflbednvsq.supabase.co/functions/v1/gemini-brain")
+
+          echo "$RESPONSE" | jq .
+          echo "$RESPONSE" | jq -e '.ok == true and (.opinion | type == "string") and (.opinion | length > 0)' >/dev/null
+          echo "Gemini Brain end-to-end test passed."
