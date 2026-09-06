@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { Client } from "npm:@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "npm:@modelcontextprotocol/sdk/client/streamableHttp.js";
 
 const PROJECT_REF = "hdcpvwsndxxflbednvsq";
 const MCP_URL = `https://${PROJECT_REF}.supabase.co/functions/v1/open-brain-mcp`;
