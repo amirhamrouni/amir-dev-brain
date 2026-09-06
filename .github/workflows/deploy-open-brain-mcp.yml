@@ -23,16 +23,18 @@ jobs:
         with:
           version: latest
 
-      - name: Prepare official OB1 MCP function
+      - name: Prepare pinned OB1 MCP function
         shell: bash
+        env:
+          OB1_COMMIT: 9543c29a3e44a210ce278392b9fac11248997461
         run: |
           set -euo pipefail
           mkdir -p supabase/functions/open-brain-mcp
           curl --fail --silent --show-error --location \
-            https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/index.ts \
+            "https://raw.githubusercontent.com/NateBJones-Projects/OB1/${OB1_COMMIT}/server/index.ts" \
             --output supabase/functions/open-brain-mcp/index.ts
           curl --fail --silent --show-error --location \
-            https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/deno.json \
+            "https://raw.githubusercontent.com/NateBJones-Projects/OB1/${OB1_COMMIT}/server/deno.json" \
             --output supabase/functions/open-brain-mcp/deno.json
           test -s supabase/functions/open-brain-mcp/index.ts
           test -s supabase/functions/open-brain-mcp/deno.json
