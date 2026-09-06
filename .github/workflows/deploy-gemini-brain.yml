@@ -1,0 +1,44 @@
+name: Deploy Gemini Brain
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-gemini-brain.yml"
+      - "supabase/functions/gemini-brain/**"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Sync Gemini secret to Supabase
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${GEMINI_API_KEY:-}"
+          supabase secrets set GEMINI_API_KEY="$GEMINI_API_KEY" \
+            --project-ref hdcpvwsndxxflbednvsq
+
+      - name: Deploy gemini-brain
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase functions deploy gemini-brain \
+            --project-ref hdcpvwsndxxflbednvsq \
+            --no-verify-jwt \
+            --debug
