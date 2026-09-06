@@ -50,7 +50,7 @@ const injected = String.raw`
     "amir_project_context",
     {
       title: "Get Amir Project Context",
-      description: "Load governed Amir Dev Brain context for one project, including development protocol, approved decisions, registry, and project memory. This bypasses web search/robots by reading raw GitHub content server-side.",
+      description: "Load governed Amir Dev Brain context for one project, including development protocol, approved decisions, registry, project memory, and cross-model council opinions. This bypasses web search/robots by reading raw GitHub content server-side.",
       annotations: { readOnlyHint: true },
       inputSchema: {
         project_slug: z.string().describe("Project memory filename without .md, e.g. english-twin, basira, amir-music-os"),
@@ -64,6 +64,10 @@ const injected = String.raw`
           ["APPROVED_DECISIONS", \`${'${AMIR_BRAIN_RAW}'}/decisions/APPROVED_DECISIONS.md\`],
           ["PROJECT_REGISTRY", \`${'${AMIR_BRAIN_RAW}'}/PROJECTS.md\`],
           ["PROJECT_MEMORY", \`${'${AMIR_BRAIN_RAW}'}/projects/${'${safe}'}.md\`],
+          ["COUNCIL_CHATGPT", \`${'${AMIR_BRAIN_RAW}'}/council/chatgpt-opinions.md\`],
+          ["COUNCIL_GEMINI", \`${'${AMIR_BRAIN_RAW}'}/council/gemini-opinions.md\`],
+          ["COUNCIL_CLAUDE", \`${'${AMIR_BRAIN_RAW}'}/council/claude-opinions.md\`],
+          ["COUNCIL_CODEX", \`${'${AMIR_BRAIN_RAW}'}/council/codex-opinions.md\`],
         ] as const;
         const parts: string[] = [];
         for (const [label, url] of urls) {
