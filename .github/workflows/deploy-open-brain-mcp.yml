@@ -7,6 +7,7 @@ on:
     paths:
       - ".github/workflows/deploy-open-brain-mcp.yml"
       - "scripts/patch-open-brain.mjs"
+      - "scripts/patch-council-orchestrator.mjs"
       - "supabase/**"
 
 permissions:
@@ -43,6 +44,9 @@ jobs:
       - name: Add Amir project and GitHub tools
         run: node scripts/patch-open-brain.mjs supabase/functions/open-brain-mcp/index.ts
 
+      - name: Add autonomous AI council orchestrator
+        run: node scripts/patch-council-orchestrator.mjs supabase/functions/open-brain-mcp/index.ts
+
       - name: Normalize generated TypeScript
         shell: bash
         run: |
@@ -62,6 +66,7 @@ jobs:
           grep -q 'amir_project_context' supabase/functions/open-brain-mcp/index.ts
           grep -q 'github_repo_state' supabase/functions/open-brain-mcp/index.ts
           grep -q 'github_fetch_file' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'amir_council_debate' supabase/functions/open-brain-mcp/index.ts
           if grep -q '\\`' supabase/functions/open-brain-mcp/index.ts; then
             echo 'Escaped backticks remain in generated TypeScript'
             exit 1
