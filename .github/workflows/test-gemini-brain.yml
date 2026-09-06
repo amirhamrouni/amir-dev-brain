@@ -25,13 +25,23 @@ jobs:
             exit 1
           fi
 
-          RESPONSE=$(curl --fail-with-body --silent --show-error \
+          BODY_FILE=$(mktemp)
+          STATUS=$(curl --silent --show-error \
+            --output "$BODY_FILE" \
+            --write-out "%{http_code}" \
             -X POST \
             -H "content-type: application/json" \
             -H "x-amir-key: ${MCP_ACCESS_KEY}" \
             -d '{"project_key":"amir-dev-brain","question":"What is Amir Dev Brain and what should be the next technical step?"}' \
             "https://hdcpvwsndxxflbednvsq.supabase.co/functions/v1/gemini-brain")
 
-          echo "$RESPONSE" | jq .
-          echo "$RESPONSE" | jq -e '.ok == true and (.opinion | type == "string") and (.opinion | length > 0)' >/dev/null
+          echo "HTTP status: $STATUS"
+          cat "$BODY_FILE" | jq . || cat "$BODY_FILE"
+
+          if [ "$STATUS" != "200" ]; then
+            echo "Gemini Brain returned HTTP $STATUS"
+            exit 1
+          fi
+
+          jq -e '.ok == true and (.opinion | type == "string") and (.opinion | length > 0)' "$BODY_FILE" >/dev/null
           echo "Gemini Brain end-to-end test passed."
