@@ -25,8 +25,32 @@ Use ECC-style discipline:
 4. Review code and architecture impact.
 5. Run tests/build/lint relevant to the change.
 6. Resolve failures rather than hiding them.
-7. Verify CI/release/deployment state when applicable.
-8. Update Amir Dev Brain after a material verified milestone.
+7. For web applications, when the execution environment supports it, run a real browser verification pass with the official Google Chrome DevTools MCP before calling user-visible frontend work complete.
+8. Verify CI/release/deployment state when applicable.
+9. Update Amir Dev Brain after a material verified milestone.
+
+## Browser verification gate — Web apps
+Chrome DevTools MCP (`ChromeDevTools/chrome-devtools-mcp`) is the preferred browser evidence tool for web projects when available in the active coding environment.
+
+Use it after implementation and before claiming a frontend feature, bug fix, release candidate or production deployment is complete. The agent should verify the relevant user flow against the real app rather than infer success from source code alone.
+
+Minimum browser checks when relevant:
+- Open the actual page/build and exercise the changed user flow.
+- Check browser console for runtime errors, warnings that indicate broken behavior, and uncaught exceptions.
+- Inspect failed or suspicious network requests and confirm key API requests return expected results.
+- Inspect DOM/rendered state when the bug concerns layout, visibility, navigation, forms or state transitions.
+- Capture screenshots or other browser evidence when it materially helps verify visual behavior.
+- Run a DevTools performance trace when the task is about performance, loading, responsiveness or runtime bottlenecks.
+- Re-test after a fix instead of assuming the code change resolved the observed problem.
+
+Evidence rule:
+- Browser verification is evidence of runtime behavior, not a replacement for tests, CI, repository state or deployment verification.
+- Record material browser findings in the project record when they affect release status or the next engineering decision.
+- If Chrome DevTools MCP is unavailable in the current host, say so explicitly and use the strongest available runtime/browser verification method instead; do not fabricate browser evidence.
+
+Security rule:
+- Treat browser sessions as sensitive. Do not expose credentials, tokens, personal data or authenticated private content in logs, screenshots, prompts or project memory.
+- Do not use a personal authenticated browser session for destructive automation unless the task explicitly requires it and the action is appropriate.
 
 ## Status vocabulary
 - `verified-current`: checked against the live repository or deployment in the current work session.
@@ -57,3 +81,5 @@ Use a reusable Jetpack Compose design system with coherent typography, spacing, 
 
 ## Completion rule
 A task is not considered complete merely because code was written. Completion requires the relevant build/test/release evidence for that task and an updated project record when the milestone is material.
+
+For user-visible web changes, when Chrome DevTools MCP is available, completion also requires relevant runtime browser evidence (for example console/network/DOM/user-flow verification) in addition to code/tests/CI.
