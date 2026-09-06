@@ -59,6 +59,13 @@ Before planning, coding, refactoring, reviewing, debugging, or deploying any Ami
 - Goal: complete real Android educational application built with AI/Vibe Coding, Firebase/cloud backend, authentication, and production engineering quality.
 - Treat as a real app, not a mock/demo. Inspect current repository and deployment state before continuing.
 
+## 8. توأمي الذكي حمروني / Smart Twin Hamrouni
+- Project record: `projects/smart-twin-hamrouni.md`
+- Status: `planned` / discovery-discussion only.
+- Repository: not created yet.
+- Goal: standalone intelligent social-content operating system using specialized agents to research relevant trends, generate human-style posts/images/short videos, adapt content per platform, schedule/publish to Facebook/Instagram/TikTok, and learn from performance under Amir-defined settings and approval rules.
+- Important: no architecture, provider, automation, or publishing decision is approved yet. Major decisions should be compared using at least three model opinions and promoted only after Amir explicitly approves.
+
 ## Shared development system
 - Amir Dev Brain is the central coordination/memory layer.
 - GitHub is source of truth for code, commits, CI, releases and deployment history.
