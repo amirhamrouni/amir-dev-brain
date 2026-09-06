@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "amir-open-brain": {
+      "type": "http",
+      "url": "https://hdcpvwsndxxflbednvsq.supabase.co/functions/v1/open-brain-mcp",
+      "headers": {
+        "x-brain-key": "${MCP_ACCESS_KEY}"
+      }
+    },
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}"
+      }
+    }
+  }
+}
