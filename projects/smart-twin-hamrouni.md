@@ -95,6 +95,24 @@ Before major architecture/product decisions:
 4. Present Amir with the recommended option and alternatives.
 5. Only Amir's explicit approval promotes a choice to an authoritative decision.
 
+## Mandatory Council write-back rule
+When Claude, Gemini, ChatGPT, Codex, or another connected model is asked for a Council opinion about this project, the model MUST persist its completed opinion before ending the response.
+
+Required behavior:
+1. Use the Amir Dev Brain / Open Brain `capture_thought` tool after forming the opinion.
+2. Store the opinion as a model opinion, never as an approved decision.
+3. Use a topic/tag that clearly identifies both the project and model, for example:
+   - `smart-twin-hamrouni:council:claude`
+   - `smart-twin-hamrouni:council:gemini`
+   - `smart-twin-hamrouni:council:chatgpt`
+   - `smart-twin-hamrouni:council:codex`
+4. The stored thought should include: model name, date, architecture proposal, MVP scope, recommended stack, main trade-offs, risks, first implementation steps, and what should be deferred.
+5. After capture, verify persistence with `search_thoughts` or `list_thoughts` before claiming the opinion was saved.
+6. If persistence fails, report the exact tool failure; do not claim success.
+7. Do not ask Amir to copy/paste the opinion into another system. The connected model is responsible for its own write-back.
+
+This write-back rule is part of project workflow, not an architectural/product decision.
+
 ## Open questions for later discussion
 - Intended user scope: Amir only vs future multi-user product.
 - Number/type of social accounts and pages.
