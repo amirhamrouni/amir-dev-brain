@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/deploy-open-brain-mcp.yml"
+      - "scripts/patch-open-brain.mjs"
       - "supabase/**"
 
 permissions:
@@ -38,6 +39,17 @@ jobs:
             --output supabase/functions/open-brain-mcp/deno.json
           test -s supabase/functions/open-brain-mcp/index.ts
           test -s supabase/functions/open-brain-mcp/deno.json
+
+      - name: Add Amir project and GitHub tools
+        run: node scripts/patch-open-brain.mjs supabase/functions/open-brain-mcp/index.ts
+
+      - name: Verify patched tools exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'amir_project_context' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'github_repo_state' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'github_fetch_file' supabase/functions/open-brain-mcp/index.ts
 
       - name: Deploy open-brain-mcp
         env:
