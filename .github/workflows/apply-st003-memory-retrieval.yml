@@ -39,7 +39,7 @@ jobs:
             --header 'content-type: application/json' \
             --data @migration-payload.json)
           cat migration-result.json
-          test "$HTTP_CODE" = "200"
+          case "$HTTP_CODE" in 2*) ;; *) echo "Unexpected migration HTTP $HTTP_CODE"; exit 1 ;; esac
 
       - name: Verify superseded_by exists
         env:
@@ -59,7 +59,7 @@ jobs:
             --header 'content-type: application/json' \
             --data @verify-payload.json)
           cat verify-result.json
-          test "$HTTP_CODE" = "200"
+          case "$HTTP_CODE" in 2*) ;; *) echo "Unexpected verification HTTP $HTTP_CODE"; exit 1 ;; esac
           python - <<'PY'
           import json
           data=json.load(open('verify-result.json'))
