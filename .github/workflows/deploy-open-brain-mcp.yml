@@ -9,6 +9,7 @@ on:
       - "scripts/patch-open-brain.mjs"
       - "scripts/patch-council-orchestrator.mjs"
       - "scripts/patch-council-reasoning.mjs"
+      - "scripts/patch-council-free-tier.mjs"
       - "supabase/**"
 
 permissions:
@@ -48,8 +49,11 @@ jobs:
       - name: Add autonomous AI council orchestrator
         run: node scripts/patch-council-orchestrator.mjs supabase/functions/open-brain-mcp/index.ts
 
-      - name: Constrain council reasoning budget
+      - name: Apply legacy council budget patch
         run: node scripts/patch-council-reasoning.mjs supabase/functions/open-brain-mcp/index.ts
+
+      - name: Switch council to zero-cost free-tier models
+        run: node scripts/patch-council-free-tier.mjs supabase/functions/open-brain-mcp/index.ts
 
       - name: Normalize generated TypeScript
         shell: bash
@@ -71,8 +75,17 @@ jobs:
           grep -q 'github_repo_state' supabase/functions/open-brain-mcp/index.ts
           grep -q 'github_fetch_file' supabase/functions/open-brain-mcp/index.ts
           grep -q 'amir_council_debate' supabase/functions/open-brain-mcp/index.ts
-          grep -q 'reasoning: { max_tokens: 40, exclude: true }' supabase/functions/open-brain-mcp/index.ts
-          grep -q 'max_tokens: 220' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'google/gemini-2.0-flash-exp:free' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'qwen/qwen-2.5-coder-32b-instruct:free' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'max_tokens: 1800' supabase/functions/open-brain-mcp/index.ts
+          if grep -q 'openai/gpt-5.6-luna-pro' supabase/functions/open-brain-mcp/index.ts; then
+            echo 'Paid OpenAI council model remains in generated server'
+            exit 1
+          fi
+          if grep -q 'google/gemini-2.5-pro' supabase/functions/open-brain-mcp/index.ts; then
+            echo 'Paid Gemini council model remains in generated server'
+            exit 1
+          fi
           if grep -q '\\`' supabase/functions/open-brain-mcp/index.ts; then
             echo 'Escaped backticks remain in generated TypeScript'
             exit 1
