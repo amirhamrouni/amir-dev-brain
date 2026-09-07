@@ -141,5 +141,20 @@ Only decisions explicitly approved by Amir belong here. Model suggestions are no
   - Retrieval results should retain provenance and authority metadata. GitHub remains the source of truth for live implementation state under AD-002; Open Brain remains the canonical persistent episodic memory layer under AD-007.
 - Evidence basis: autonomous free-tier Amir AI Council debate `open-brain-memory-retrieval-and-context-optimization`, Open Brain thought `fc8d2281-db97-4a7b-a287-6d93275f6e8b`, followed by Amir's explicit approval on 2026-09-07.
 
+#### ST-004 — Dev Brain Conflict Resolution Mechanism
+- Status: approved
+- Scope: Amir Dev Brain / Open Brain Council Runtime and governed memory retrieval
+- Authority: Amir
+- Decision date: 2026-09-07
+- Decision:
+  - Preserve **Flag & Include** as the default for informational memory conflicts. A `[CONFLICT_FLAG]` alone must never stop a Council debate.
+  - Use **deterministic fail-fast** only when a pending executable Tool Call or Action matches an explicit rule showing that execution would violate an Approved Decision.
+  - Merely retrieving two conflicting approved memories does not by itself halt the session; the conflict remains visible in context and must be surfaced in synthesis unless an executable action is actually blocked.
+  - `blocked_action` must be produced only by explicit deterministic governance rules, never by free-form model judgment or semantic guessing.
+  - Persist conflict metadata support on thoughts using `conflict_source`, `resolution_status`, and `blocked_action`.
+  - Keep the cache metadata-only. Invalidate affected metadata cache entries automatically when `superseded_by` or `resolution_status` changes.
+  - When fail-fast triggers, stop the executable operation and return an explicit Amir-intervention-required result containing the violated Approved Decision IDs and reasons.
+- Evidence basis: autonomous free-tier Council debate `dev-brain-conflict-resolution-mechanism`, Open Brain thought `5a9b3aa1-d4c5-4474-9cc2-96acce5aecea`, followed by Amir's explicit approval on 2026-09-07.
+
 ## Maintenance
 When Amir explicitly approves a new decision, append it here with a stable ID. If a decision is later changed, mark the older entry `superseded` and link the replacement rather than deleting history.
