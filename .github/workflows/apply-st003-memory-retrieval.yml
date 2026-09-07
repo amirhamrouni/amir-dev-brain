@@ -1,0 +1,150 @@
+name: Apply ST-003 Memory Retrieval
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/migrations/20260907141000_st003_thought_supersession.sql"
+      - ".github/workflows/apply-st003-memory-retrieval.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apply-and-capture:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply ST-003 database migration through Supabase Management API
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          sql = Path('supabase/migrations/20260907141000_st003_thought_supersession.sql').read_text()
+          Path('migration-payload.json').write_text(json.dumps({'query': sql}), encoding='utf-8')
+          PY
+          HTTP_CODE=$(curl --silent --show-error \
+            --output migration-result.json \
+            --write-out '%{http_code}' \
+            --request POST \
+            'https://api.supabase.com/v1/projects/hdcpvwsndxxflbednvsq/database/query' \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            --header 'content-type: application/json' \
+            --data @migration-payload.json)
+          cat migration-result.json
+          test "$HTTP_CODE" = "200"
+
+      - name: Verify superseded_by exists
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > verify-payload.json <<'JSON'
+          {"query":"select column_name, data_type from information_schema.columns where table_schema='public' and table_name='thoughts' and column_name='superseded_by';"}
+          JSON
+          HTTP_CODE=$(curl --silent --show-error \
+            --output verify-result.json \
+            --write-out '%{http_code}' \
+            --request POST \
+            'https://api.supabase.com/v1/projects/hdcpvwsndxxflbednvsq/database/query' \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            --header 'content-type: application/json' \
+            --data @verify-payload.json)
+          cat verify-result.json
+          test "$HTTP_CODE" = "200"
+          python - <<'PY'
+          import json
+          data=json.load(open('verify-result.json'))
+          rows=data if isinstance(data, list) else data.get('result', data.get('data', []))
+          if not rows or not any(r.get('column_name') == 'superseded_by' for r in rows if isinstance(r, dict)):
+              raise SystemExit('superseded_by verification failed: '+str(data))
+          print('Verified public.thoughts.superseded_by')
+          PY
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.116.0
+
+      - name: Generate one-shot runner token
+        id: token
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKEN=$(openssl rand -hex 32)
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+          echo "::add-mask::$TOKEN"
+
+      - name: Set temporary runner secret
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          RUNNER_TOKEN: ${{ steps.token.outputs.token }}
+        run: |
+          supabase secrets set COUNCIL_RUNNER_TOKEN="$RUNNER_TOKEN" --project-ref hdcpvwsndxxflbednvsq
+
+      - name: Deploy one-shot E2E runner
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase functions deploy council-e2e-runner \
+            --project-ref hdcpvwsndxxflbednvsq \
+            --no-verify-jwt \
+            --use-api
+
+      - name: Capture ST-003 approved decision in Open Brain
+        env:
+          RUNNER_TOKEN: ${{ steps.token.outputs.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          content = '''APPROVED DECISION — ST-003: Open Brain Memory Retrieval. Project: amir-dev-brain. Authority: Amir. Decision date: 2026-09-07. Adopt layered retrieval: deterministic metadata filtering -> hybrid lexical/semantic retrieval -> authority-aware ranking/conflict handling -> deduplicated token-budget packing. Active-project scope is default; cross-project retrieval is explicit opt-in. Stale memories are retained, never deleted merely because they are superseded, and public.thoughts gains superseded_by pointing to the replacing thought for auditability. Long debates use Session Digest so later rounds receive a compact digest plus new evidence instead of the full transcript. Conflict policy is Flag & Include: conflicting memories remain visible with provenance/annotations for Amir intervention rather than silent suppression. Cache is limited initially to metadata-level caching only. GitHub remains source of truth for live implementation state under AD-002; Open Brain remains canonical persistent episodic memory under AD-007. Evidence: Council thought fc8d2281-db97-4a7b-a287-6d93275f6e8b and Amir explicit approval on 2026-09-07. Status: approved.'''
+          open('capture-payload.json','w').write(json.dumps({'tool_name':'capture_thought','content':content}))
+          PY
+          HTTP_CODE=$(curl --silent --show-error \
+            --output capture-result.json \
+            --write-out '%{http_code}' \
+            --request POST \
+            'https://hdcpvwsndxxflbednvsq.supabase.co/functions/v1/council-e2e-runner' \
+            --header "x-runner-token: $RUNNER_TOKEN" \
+            --header 'content-type: application/json' \
+            --data @capture-payload.json)
+          cat capture-result.json
+          test "$HTTP_CODE" = "200"
+          python - <<'PY'
+          import json
+          data=json.load(open('capture-result.json'))
+          if not data.get('ok') or data.get('tool') != 'capture_thought':
+              raise SystemExit('Open Brain capture failed: '+str(data))
+          print('ST-003 captured in Open Brain successfully')
+          PY
+
+      - name: Upload ST-003 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: st003-memory-retrieval-evidence
+          path: |
+            migration-result.json
+            verify-result.json
+            capture-result.json
+          if-no-files-found: warn
+
+      - name: Remove temporary runner secret
+        if: always()
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        shell: bash
+        run: |
+          if command -v supabase >/dev/null 2>&1; then
+            supabase secrets unset COUNCIL_RUNNER_TOKEN --project-ref hdcpvwsndxxflbednvsq || true
+          fi
