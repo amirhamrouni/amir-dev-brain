@@ -14,6 +14,7 @@ on:
       - "scripts/st003-retrieval-core.mjs"
       - "tests/st003-retrieval-core.test.mjs"
       - "scripts/patch-st004-conflict-resolution.mjs"
+      - "scripts/patch-st004-metadata-cache.mjs"
       - "scripts/st004-conflict-resolution-core.mjs"
       - "tests/st004-conflict-resolution-core.test.mjs"
       - "supabase/**"
@@ -70,6 +71,9 @@ jobs:
       - name: Apply ST-004 deterministic conflict resolution
         run: node scripts/patch-st004-conflict-resolution.mjs supabase/functions/open-brain-mcp/index.ts
 
+      - name: Apply ST-004 metadata cache read path
+        run: node scripts/patch-st004-metadata-cache.mjs supabase/functions/open-brain-mcp/index.ts
+
       - name: Normalize generated TypeScript
         shell: bash
         run: |
@@ -98,6 +102,9 @@ jobs:
           grep -q 'superseded_by' supabase/functions/open-brain-mcp/index.ts
           grep -q 'resolution_status' supabase/functions/open-brain-mcp/index.ts
           grep -q 'blocked_action' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'open_brain_metadata_cache' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'st004ReadCachedMetadata' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'st004WriteCachedMetadata' supabase/functions/open-brain-mcp/index.ts
           grep -q '\[CONFLICT_FLAG topics=' supabase/functions/open-brain-mcp/index.ts
           grep -q 'google/gemini-2.0-flash-exp:free' supabase/functions/open-brain-mcp/index.ts
           grep -q 'qwen/qwen-2.5-coder-32b-instruct:free' supabase/functions/open-brain-mcp/index.ts
