@@ -1,0 +1,103 @@
+name: Run English Twin Memory Council
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/run-english-twin-memory-council.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  council:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.116.0
+
+      - name: Generate one-shot runner token
+        id: token
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKEN=$(openssl rand -hex 32)
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+          echo "::add-mask::$TOKEN"
+
+      - name: Set temporary runner secret
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          RUNNER_TOKEN: ${{ steps.token.outputs.token }}
+        run: |
+          supabase secrets set COUNCIL_RUNNER_TOKEN="$RUNNER_TOKEN" --project-ref hdcpvwsndxxflbednvsq
+
+      - name: Deploy one-shot E2E runner
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase functions deploy council-e2e-runner \
+            --project-ref hdcpvwsndxxflbednvsq \
+            --no-verify-jwt \
+            --use-api
+
+      - name: Run amir_council_debate
+        env:
+          RUNNER_TOKEN: ${{ steps.token.outputs.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > council-payload.json <<'JSON'
+          {
+            "project_slug": "amir-dev-brain",
+            "question": "Topic: english-twin-architecture-and-memory-separation. Discuss the technical architecture for building and integrating English Twin. How should the system handle English-language context and future multilingual learning context? Compare two strategies: (A) separate Memory Workspaces per language to prevent context contamination, versus (B) one canonical Open Brain database with metadata such as language_locale and strict retrieval filters. Evaluate retrieval precision, context leakage risk, cross-language transfer, learner profile continuity, operational complexity, schema/indexing, migrations, scaling, privacy, conflict resolution, and token efficiency. Recommend the strongest MVP architecture and an evolution path. This is a council recommendation/model opinion only, never an Approved Decision unless Amir explicitly approves it.",
+            "rounds": 3
+          }
+          JSON
+
+          HTTP_CODE=$(curl --silent --show-error \
+            --output council-e2e-result.json \
+            --write-out '%{http_code}' \
+            --request POST \
+            'https://hdcpvwsndxxflbednvsq.supabase.co/functions/v1/council-e2e-runner' \
+            --header "x-runner-token: $RUNNER_TOKEN" \
+            --header 'content-type: application/json' \
+            --data @council-payload.json)
+          echo "Council runner HTTP $HTTP_CODE"
+          cat council-e2e-result.json
+
+          python - <<'PY'
+          import json
+          data=json.load(open('council-e2e-result.json', encoding='utf-8'))
+          if not data.get('ok'):
+              raise SystemExit('Council runner returned failure: '+str(data))
+          text=' '.join(str(x.get('text','')) for x in data.get('result',{}).get('content',[]) if isinstance(x,dict))
+          if 'Saved to Open Brain thought:' not in text:
+              raise SystemExit('Council result did not confirm Open Brain persistence')
+          print('Council completed and synthesis persisted to Open Brain')
+          PY
+
+      - name: Upload result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: english-twin-memory-council-result
+          path: |
+            council-payload.json
+            council-e2e-result.json
+          if-no-files-found: warn
+
+      - name: Remove temporary runner secret
+        if: always()
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        shell: bash
+        run: |
+          if command -v supabase >/dev/null 2>&1; then
+            supabase secrets unset COUNCIL_RUNNER_TOKEN --project-ref hdcpvwsndxxflbednvsq || true
+          fi
