@@ -107,6 +107,23 @@ Only decisions explicitly approved by Amir belong here. Model suggestions are no
   - Defer full Content Genome vocabulary/rhythm/CTA profiling, automated constraint relaxation, multi-variant competition, and complex ML analytics until post-V1 evidence justifies them.
 - Evidence basis: autonomous free-tier Amir AI Council debate `ai-content-brain-architecture-and-approval-ui`, Open Brain thought `119c15e4-c45f-4a4c-80f4-e1515131ba20`, followed by Amir's explicit approval on 2026-09-07.
 
+#### ST-004 — OpenRouter AI Content Creator Adapter & 2-Step Generation Pipeline
+- Status: approved
+- Scope: Smart Twin Hamrouni V1 Creation phase
+- Authority: Amir
+- Decision date: 2026-09-07
+- Decision:
+  - Use a typed `ContentGenerationPort` / provider-adapter boundary so AI generation remains replaceable and vendor-neutral.
+  - The V1 OpenRouter implementation is `OpenRouterGenerationAdapter` using OpenRouter free routing by default.
+  - **Step 1** receives the `ContentBrief` and generates **Base Copy only**.
+  - **Step 2** receives the Base Copy and generates strict JSON with exactly: `facebook_copy`, `instagram_copy`, and `image_prompt`.
+  - Keep Facebook and Instagram variants separate in `ContentDraft`; do not collapse them back into one generic copy field.
+  - Emit `GenerationAttempt` and `GenerationSuccess` to the PostgreSQL Content Brain event store for successful generation calls.
+  - On API failure, empty response, rate limit, or invalid Step-2 output, emit `GenerationFailure`; retry 429/5xx failures with bounded backoff and honor `Retry-After` when available.
+  - Human approval remains mandatory after generation; ST-004 does not weaken ST-001/ST-002 approval boundaries.
+  - Ignore unapproved free-model hallucinations such as treating a deferred Content Genome as an approved V1 requirement.
+- Evidence basis: free-tier Council debate `ai-content-generator-adapter-design`, Open Brain thought `6103f570-7307-4805-9199-3ff3d2e1b2c7`, followed by Amir's Executive Override and explicit approval on 2026-09-07.
+
 ### Amir Dev Brain
 
 #### ST-003 — Open Brain Memory Retrieval
