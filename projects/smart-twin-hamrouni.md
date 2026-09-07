@@ -3,11 +3,11 @@
 - Project: توأمي الذكي حمروني
 - Working English name: Smart Twin Hamrouni
 - Brain status: `verified-current`
-- Phase: V1 vertical slice implemented and CI green
+- Phase: production adapters + deployment smoke path verified in CI
 - Repository: `amirhamrouni/smart-twin-hamrouni`
 - Default branch: `main`
-- Latest verified checkpoint commit: `48eaa7c24af69e3aecd2c4b3871355e99ae2988f`
-- Latest verified CI: run `#14` / run id `34069227286` / `success`
+- Latest verified checkpoint commit: `60e8b8e7a299f846be5f400c87269bf84334a4e3`
+- Latest verified CI: run `#46` / run id `34070319156` / `success`
 - Authoritative decision: `ST-001` in `decisions/APPROVED_DECISIONS.md`
 
 ## Core vision
@@ -113,22 +113,21 @@ Deferred from V1:
 - Result: Council recommendation was reviewed by Amir. The refined capability-based orchestration approach with Inngest as initial driver was explicitly approved and promoted to `ST-001`.
 
 ## Verified implementation checkpoint — 2026-09-07
-- Repository created and verified: `amirhamrouni/smart-twin-hamrouni`.
-- Current implementation commit: `48eaa7c24af69e3aecd2c4b3871355e99ae2988f`.
-- CI run `#14` (`34069227286`) completed `success`.
-- Quality gate passed: install, TypeScript typecheck, ESLint, vertical-slice test, and Next.js/workspace build.
-- The first implemented vertical slice is:
-  - manual topic input
-  - `runStrategy`
-  - draft creation
-  - stored `PENDING_APPROVAL` state via current repository adapter
-  - approval endpoint
-  - `JobOrchestrator` capability boundary
-  - Inngest driver dispatch with idempotency key
-  - durable `operations.publish` Inngest handler
-  - interactive Approval Queue UI
-- E2E service test verifies: manual topic -> draft -> `PENDING_APPROVAL` -> approval -> `operations.publish` dispatch -> `APPROVED` state.
-- Important implementation truth: the current draft repository is still `InMemoryDraftRepository` and the current publisher is `RecordingPublisher`. These are verified vertical-slice adapters, not production database or Meta publishing integrations. Do not report production durability/publishing until those adapters are replaced and verified.
+- Repository: `amirhamrouni/smart-twin-hamrouni`.
+- Current verified implementation commit: `60e8b8e7a299f846be5f400c87269bf84334a4e3`.
+- CI run `#46` (`34070319156`) completed `success`.
+- Quality gate passed against a real PostgreSQL 16 service container: install, migration, seed, smoke-publish dry run, TypeScript typecheck, ESLint, tests, and production build.
+- Production persistence is implemented through `PostgresBriefRepository` and `PostgresDraftRepository`; runtime no longer depends on the in-memory draft repository.
+- `content_briefs` and `content_drafts` SQL migration is implemented and exercised in CI.
+- Production publishing adapter is `MetaGraphPublisher` for Facebook Page publishing and Instagram professional-account media publishing.
+- Meta retry behavior covers rate limiting/transient failures and `Retry-After`; Inngest remains the durable job driver behind the orchestration capability boundary.
+- Runtime publishing state path is `APPROVED -> PUBLISHING -> PUBLISHED / FAILED`.
+- `.env.example` documents PostgreSQL/Supabase, Inngest and Meta environment variables without committing secrets.
+- Live CLI smoke command exists: `pnpm smoke:publish <draftId>`, guarded by `ALLOW_LIVE_META_PUBLISH=true`.
+- Safe CI smoke mode exists: `pnpm smoke:publish draft_sample_01 --dry-run`; it loads the real PostgreSQL draft and makes no external Meta call.
+- Idempotent seed command exists: `pnpm db:seed`; it creates/resets `brief_sample_01` and `draft_sample_01` with status `APPROVED` and a test image URL.
+- `README.md` documents Install -> Env Setup -> Migration -> Seed -> Dry Run -> Live Smoke Publish.
+- Important implementation truth: Meta Graph API behavior is verified with mocked external network tests and the complete smoke path is verified against real PostgreSQL, but **no live Facebook/Instagram post has been executed yet** because Amir's real Meta credentials/Page IDs are not present in the connected execution environment.
 
 ## Initial agent-system ideas — product roles
 These remain useful role boundaries inside the approved workflow; they do not imply separate distributed agent services in V1.
@@ -181,9 +180,8 @@ These are implementation details to resolve without changing ST-001 unless they 
 - Meta app/API permission state for the Facebook/Instagram account pair
 - initial image-generation provider
 - hosting/runtime choice for web/backend
-- production database/object-storage implementation
-- replacement of `InMemoryDraftRepository` with durable database persistence
-- replacement of `RecordingPublisher` with official Meta publishing integration
+- object-storage implementation for generated media
+- first real Meta credentials + Page/Instagram account configuration for live publish verification
 
 ## Current next step
-Vertical slice is verified. Continue implementation inside ST-001 without re-opening architecture: replace the temporary draft/publisher adapters with production persistence and the first official Facebook/Instagram publishing integration, then verify the real user flow and runtime behavior before expanding scope.
+Deployment-readiness path is verified. The next production gate is a controlled live publish using Amir's real environment variables and the seeded `draft_sample_01`, followed by verification of returned Meta IDs and final persisted draft state. After that, continue V1 with real content generation/media storage and the first automated trend source without expanding deferred scope.
