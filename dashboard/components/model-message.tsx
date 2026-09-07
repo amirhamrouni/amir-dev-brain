@@ -10,16 +10,22 @@ export function ModelMessage({ message, index }: { message: CouncilMessage; inde
 
   return (
     <motion.article
-      initial={{ opacity: 0, y: 16, scale: 0.985 }}
+      initial={{ opacity: 0, y: 18, scale: 0.985 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ delay: Math.min(index * 0.045, 0.2), type: "spring", stiffness: 260, damping: 26 }}
+      transition={{ delay: Math.min(index * 0.045, 0.2), type: "spring", stiffness: 250, damping: 25 }}
       className={`model-message ${isBlue ? "model-message--blue" : "model-message--red"}`}
     >
+      <motion.div
+        className="neural-pulse"
+        aria-hidden="true"
+        animate={{ opacity: [.18, .65, .18], scale: [.94, 1.04, .94] }}
+        transition={{ duration: 2.5 + (index % 3) * .35, repeat: Infinity, ease: "easeInOut" }}
+      />
       <div className="model-message__rail" aria-hidden="true" />
       <div className="model-message__header">
-        <div className="model-avatar">
+        <motion.div className="model-avatar" animate={{ boxShadow: isBlue ? ["0 0 0 rgba(78,140,255,0)", "0 0 24px rgba(78,140,255,.35)", "0 0 0 rgba(78,140,255,0)"] : ["0 0 0 rgba(255,95,114,0)", "0 0 24px rgba(255,95,114,.3)", "0 0 0 rgba(255,95,114,0)"] }} transition={{ duration: 2.8, repeat: Infinity }}>
           <Bot size={17} strokeWidth={2.1} />
-        </div>
+        </motion.div>
         <div>
           <p className="model-label">{message.modelLabel}</p>
           <p className="model-title">{message.title}</p>
@@ -31,10 +37,8 @@ export function ModelMessage({ message, index }: { message: CouncilMessage; inde
 
       <div className="model-message__footer">
         {typeof message.confidence === "number" ? (
-          <span className="confidence-pill">
-            <ShieldCheck size={13} /> {message.confidence}% confidence
-          </span>
-        ) : <span />}
+          <span className="confidence-pill"><ShieldCheck size={13} /> ثقة {message.confidence}%</span>
+        ) : <span className="confidence-pill"><ShieldCheck size={13} /> رأي نموذج</span>}
         {message.conflict ? <ConflictFlagBadge detail={message.conflict.detail} compact /> : null}
       </div>
     </motion.article>
