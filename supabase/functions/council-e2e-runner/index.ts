@@ -28,6 +28,17 @@ Deno.serve(async (req) => {
     const projectSlug = body.project_slug || "smart-twin-hamrouni";
     const question = body.question || "v1-architecture-and-pipeline";
     const rounds = Number.isInteger(body.rounds) ? body.rounds : 1;
+    const requestedTool = body.tool_name === "capture_thought" ? "capture_thought" : "amir_council_debate";
+    const requestedArguments = requestedTool === "capture_thought"
+      ? { content: String(body.content || "") }
+      : { project_slug: projectSlug, question, rounds };
+
+    if (requestedTool === "capture_thought" && !requestedArguments.content.trim()) {
+      return new Response(JSON.stringify({ ok: false, error: "capture_thought content is required" }), {
+        status: 400,
+        headers: { "content-type": "application/json" },
+      });
+    }
 
     const transport = new StreamableHTTPClientTransport(new URL(MCP_URL), {
       requestInit: {
@@ -37,15 +48,11 @@ Deno.serve(async (req) => {
       },
     });
 
-    const client = new Client({ name: "amir-council-e2e-runner", version: "1.0.0" });
+    const client = new Client({ name: "amir-council-e2e-runner", version: "1.1.0" });
     await client.connect(transport);
     const result = await client.callTool({
-      name: "amir_council_debate",
-      arguments: {
-        project_slug: projectSlug,
-        question,
-        rounds,
-      },
+      name: requestedTool,
+      arguments: requestedArguments,
     }, undefined, {
       timeout: 240_000,
       maxTotalTimeout: 240_000,
@@ -59,7 +66,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ ok: true, result }), {
+    return new Response(JSON.stringify({ ok: true, tool: requestedTool, result }), {
       status: 200,
       headers: { "content-type": "application/json" },
     });
