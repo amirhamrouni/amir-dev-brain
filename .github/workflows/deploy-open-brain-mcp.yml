@@ -71,7 +71,8 @@ jobs:
           grep -q 'github_repo_state' supabase/functions/open-brain-mcp/index.ts
           grep -q 'github_fetch_file' supabase/functions/open-brain-mcp/index.ts
           grep -q 'amir_council_debate' supabase/functions/open-brain-mcp/index.ts
-          grep -q 'reasoning: { max_tokens: 200, exclude: true }' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'reasoning: { max_tokens: 80, exclude: true }' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'max_tokens: 400' supabase/functions/open-brain-mcp/index.ts
           if grep -q '\\`' supabase/functions/open-brain-mcp/index.ts; then
             echo 'Escaped backticks remain in generated TypeScript'
             exit 1
