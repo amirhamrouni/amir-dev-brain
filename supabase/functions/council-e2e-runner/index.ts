@@ -46,6 +46,9 @@ Deno.serve(async (req) => {
         question,
         rounds,
       },
+    }, {
+      timeout: 240_000,
+      maxTotalTimeout: 240_000,
     });
     await client.close();
 
