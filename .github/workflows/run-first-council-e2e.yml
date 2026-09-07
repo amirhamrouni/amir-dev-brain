@@ -16,7 +16,7 @@ on:
       question:
         description: "Council debate topic/question"
         required: true
-        default: "ai-content-generator-adapter-design"
+        default: "ai-content-generator-adapter-design — Design the OpenRouter AI Content Creator Adapter for Smart Twin Hamrouni. The council must use retrieved ST-002 context automatically, especially the PostgreSQL Content Brain event store, ContentBrief inputs, explicit LearningSignal events, separate Facebook and Instagram variants, and human approval boundary. Design a precise 2-step pipeline: Step 1 load ContentBrief plus relevant approved LearningSignals and generate Base Copy; Step 2 take only the Base Copy plus compact constraints/context and generate Facebook variant, Instagram variant, and Image Prompt. Use OpenRouter free-routing models only. Specify TypeScript ports/adapters, DB reads/writes/events, prompt/context partitioning, structured outputs, retry/backoff/rate-limit handling, idempotency, context-token budgets, fallback behavior, and CI tests. Explicitly verify which ST-002 constraints were retrieved automatically; flag any missing or conflicting memory instead of inventing it."
         type: string
       rounds:
         description: "Council debate rounds"
@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PROJECT_SLUG: ${{ github.event.inputs.project_slug || 'smart-twin-hamrouni' }}
-      COUNCIL_QUESTION: ${{ github.event.inputs.question || 'ai-content-generator-adapter-design' }}
+      COUNCIL_QUESTION: ${{ github.event.inputs.question || 'ai-content-generator-adapter-design — Design the OpenRouter AI Content Creator Adapter for Smart Twin Hamrouni. The council must use retrieved ST-002 context automatically, especially the PostgreSQL Content Brain event store, ContentBrief inputs, explicit LearningSignal events, separate Facebook and Instagram variants, and human approval boundary. Design a precise 2-step pipeline: Step 1 load ContentBrief plus relevant approved LearningSignals and generate Base Copy; Step 2 take only the Base Copy plus compact constraints/context and generate Facebook variant, Instagram variant, and Image Prompt. Use OpenRouter free-routing models only. Specify TypeScript ports/adapters, DB reads/writes/events, prompt/context partitioning, structured outputs, retry/backoff/rate-limit handling, idempotency, context-token budgets, fallback behavior, and CI tests. Explicitly verify which ST-002 constraints were retrieved automatically; flag any missing or conflicting memory instead of inventing it.' }}
       COUNCIL_ROUNDS: ${{ github.event.inputs.rounds || '2' }}
     steps:
       - name: Checkout
