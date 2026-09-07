@@ -1,0 +1,92 @@
+name: Capture ST-002 Approved Decision
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/capture-st002-approved-decision.yml"
+      - "supabase/functions/council-e2e-runner/index.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Generate one-shot runner token
+        id: token
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKEN=$(openssl rand -hex 32)
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+          echo "::add-mask::$TOKEN"
+
+      - name: Set temporary runner secret
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          RUNNER_TOKEN: ${{ steps.token.outputs.token }}
+        run: supabase secrets set COUNCIL_RUNNER_TOKEN="$RUNNER_TOKEN" --project-ref hdcpvwsndxxflbednvsq
+
+      - name: Deploy one-shot runner
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase functions deploy council-e2e-runner \
+            --project-ref hdcpvwsndxxflbednvsq \
+            --no-verify-jwt \
+            --use-api
+
+      - name: Capture ST-002 in Open Brain
+        env:
+          RUNNER_TOKEN: ${{ steps.token.outputs.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > payload.json <<'JSON'
+          {
+            "tool_name": "capture_thought",
+            "content": "APPROVED DECISION — ST-002: Content Brain Architecture & Approval Queue V1. Project: smart-twin-hamrouni. Authority: Amir. Decision date: 2026-09-07. ST-001 remains authoritative. V1 Product Content Brain is a PostgreSQL-backed structured event store, not a monolithic AI agent or ML platform. Record DraftCreated, DraftEdited, DraftApproved, DraftRejected, PublishResult, PerformanceSnapshot, and explicit LearningSignal events. Learning signals may propose generation-parameter changes but may not silently change locked brand constraints; Amir approval is required for those changes. Specialized roles remain conceptual/code boundaries inside Strategy -> Creation -> Operations rather than V1 microservices. Approval Queue is a critical V1 operator surface with individual review of each ContentDraft, editable base/Facebook/Instagram copy, image preview/metadata when available, trend provenance, quality results, ContentBrief rationale, and explicit Edit/Approve/Reject actions. Every state-changing action writes an immutable audit/event-store record. Filtered/table overview is allowed; bulk scheduling of already-approved drafts is allowed; batch approve is forbidden in V1. Full Content Genome, automated constraint relaxation, multi-variant competition, and complex ML analytics are deferred post-V1. Evidence: Council thought 119c15e4-c45f-4a4c-80f4-e1515131ba20 and Amir explicit approval on 2026-09-07. Status: approved."
+          }
+          JSON
+          HTTP_CODE=$(curl --silent --show-error \
+            --output capture-result.json \
+            --write-out '%{http_code}' \
+            --request POST \
+            'https://hdcpvwsndxxflbednvsq.supabase.co/functions/v1/council-e2e-runner' \
+            --header "x-runner-token: $RUNNER_TOKEN" \
+            --header 'content-type: application/json' \
+            --data @payload.json)
+          cat capture-result.json
+          test "$HTTP_CODE" = "200"
+          python - <<'PY'
+          import json
+          data=json.load(open('capture-result.json'))
+          if not data.get('ok') or data.get('tool') != 'capture_thought':
+              raise SystemExit('Open Brain capture failed: '+str(data))
+          print('ST-002 captured in Open Brain successfully')
+          PY
+
+      - name: Upload capture result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: st002-open-brain-capture
+          path: capture-result.json
+          if-no-files-found: error
+
+      - name: Remove temporary runner secret
+        if: always()
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase secrets unset COUNCIL_RUNNER_TOKEN --project-ref hdcpvwsndxxflbednvsq || true
