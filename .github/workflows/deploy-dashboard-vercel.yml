@@ -49,11 +49,14 @@ jobs:
       - name: Reset local Vercel link state
         run: rm -rf .vercel
 
+      - name: Link Vercel project explicitly
+        run: npx --yes "vercel@${VERCEL_CLI_VERSION}" link --yes --project=amir-brain-console --scope=amirhamrounis-projects --token="$VERCEL_TOKEN"
+
       - name: Pull production configuration
-        run: npx --yes "vercel@${VERCEL_CLI_VERSION}" pull --yes --environment=production --token="$VERCEL_TOKEN"
+        run: npx --yes "vercel@${VERCEL_CLI_VERSION}" pull --yes --environment=production --scope=amirhamrounis-projects --token="$VERCEL_TOKEN"
 
       - name: Build production dashboard
-        run: npx --yes "vercel@${VERCEL_CLI_VERSION}" build --prod --token="$VERCEL_TOKEN"
+        run: npx --yes "vercel@${VERCEL_CLI_VERSION}" build --prod --scope=amirhamrounis-projects --token="$VERCEL_TOKEN"
 
       - name: Deploy production dashboard
-        run: npx --yes "vercel@${VERCEL_CLI_VERSION}" deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+        run: npx --yes "vercel@${VERCEL_CLI_VERSION}" deploy --prebuilt --prod --scope=amirhamrounis-projects --token="$VERCEL_TOKEN"
