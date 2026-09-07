@@ -2,9 +2,12 @@
 
 - Project: توأمي الذكي حمروني
 - Working English name: Smart Twin Hamrouni
-- Brain status: `planned`
-- Phase: architecture approved / implementation next
-- Repository: not created yet
+- Brain status: `verified-current`
+- Phase: V1 vertical slice implemented and CI green
+- Repository: `amirhamrouni/smart-twin-hamrouni`
+- Default branch: `main`
+- Latest verified checkpoint commit: `48eaa7c24af69e3aecd2c4b3871355e99ae2988f`
+- Latest verified CI: run `#14` / run id `34069227286` / `success`
 - Authoritative decision: `ST-001` in `decisions/APPROVED_DECISIONS.md`
 
 ## Core vision
@@ -109,6 +112,24 @@ Deferred from V1:
 - Persistence: Open Brain thought `702e9ed1-02bf-4b43-ad3d-4ad8525dd021`
 - Result: Council recommendation was reviewed by Amir. The refined capability-based orchestration approach with Inngest as initial driver was explicitly approved and promoted to `ST-001`.
 
+## Verified implementation checkpoint — 2026-09-07
+- Repository created and verified: `amirhamrouni/smart-twin-hamrouni`.
+- Current implementation commit: `48eaa7c24af69e3aecd2c4b3871355e99ae2988f`.
+- CI run `#14` (`34069227286`) completed `success`.
+- Quality gate passed: install, TypeScript typecheck, ESLint, vertical-slice test, and Next.js/workspace build.
+- The first implemented vertical slice is:
+  - manual topic input
+  - `runStrategy`
+  - draft creation
+  - stored `PENDING_APPROVAL` state via current repository adapter
+  - approval endpoint
+  - `JobOrchestrator` capability boundary
+  - Inngest driver dispatch with idempotency key
+  - durable `operations.publish` Inngest handler
+  - interactive Approval Queue UI
+- E2E service test verifies: manual topic -> draft -> `PENDING_APPROVAL` -> approval -> `operations.publish` dispatch -> `APPROVED` state.
+- Important implementation truth: the current draft repository is still `InMemoryDraftRepository` and the current publisher is `RecordingPublisher`. These are verified vertical-slice adapters, not production database or Meta publishing integrations. Do not report production durability/publishing until those adapters are replaced and verified.
+
 ## Initial agent-system ideas — product roles
 These remain useful role boundaries inside the approved workflow; they do not imply separate distributed agent services in V1.
 
@@ -160,8 +181,9 @@ These are implementation details to resolve without changing ST-001 unless they 
 - Meta app/API permission state for the Facebook/Instagram account pair
 - initial image-generation provider
 - hosting/runtime choice for web/backend
-- database/object-storage implementation details
-- exact internal orchestration interface contract and Inngest adapter
+- production database/object-storage implementation
+- replacement of `InMemoryDraftRepository` with durable database persistence
+- replacement of `RecordingPublisher` with official Meta publishing integration
 
 ## Current next step
-Architecture discussion is closed for V1 under `ST-001`. Start implementation by creating the Smart Twin repository and establishing the first end-to-end vertical slice and core contracts before expanding features.
+Vertical slice is verified. Continue implementation inside ST-001 without re-opening architecture: replace the temporary draft/publisher adapters with production persistence and the first official Facebook/Instagram publishing integration, then verify the real user flow and runtime behavior before expanding scope.
