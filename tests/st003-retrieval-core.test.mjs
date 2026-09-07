@@ -1,6 +1,36 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyConflictFlags, resolveSupersededMatches } from '../scripts/st003-retrieval-core.mjs';
+import {
+  applyConflictFlags,
+  matchesLanguageNamespace,
+  normalizeTargetLanguage,
+  resolveSupersededMatches,
+} from '../scripts/st003-retrieval-core.mjs';
+
+test('normalizeTargetLanguage normalizes case and underscore separators', () => {
+  assert.equal(normalizeTargetLanguage(' EN_us '), 'en-us');
+  assert.equal(normalizeTargetLanguage(''), null);
+});
+
+test('language namespace blocks other and legacy languages before semantic ranking', () => {
+  const options = { targetLanguage: 'en', memoryScope: 'english-twin', crossLanguage: false };
+  assert.equal(matchesLanguageNamespace({ target_language: 'en', memory_scope: 'english-twin', cross_language: false }, options), true);
+  assert.equal(matchesLanguageNamespace({ target_language: 'nl', memory_scope: 'english-twin', cross_language: false }, options), false);
+  assert.equal(matchesLanguageNamespace({ target_language: null, memory_scope: 'english-twin', cross_language: false }, options), false);
+  assert.equal(matchesLanguageNamespace({ target_language: 'en', memory_scope: 'other', cross_language: false }, options), false);
+});
+
+test('cross-language memory requires explicit opt-in from stored thought and caller', () => {
+  const thought = { target_language: 'nl', memory_scope: 'english-twin', cross_language: true };
+  assert.equal(matchesLanguageNamespace(thought, { targetLanguage: 'en', memoryScope: 'english-twin', crossLanguage: false }), false);
+  assert.equal(matchesLanguageNamespace(thought, { targetLanguage: 'en', memoryScope: 'english-twin', crossLanguage: true }), true);
+  assert.equal(matchesLanguageNamespace({ ...thought, cross_language: false }, { targetLanguage: 'en', memoryScope: 'english-twin', crossLanguage: true }), false);
+});
+
+test('unscoped retrieval preserves legacy behavior', () => {
+  assert.equal(matchesLanguageNamespace({ target_language: null, memory_scope: 'global' }, {}), true);
+  assert.equal(matchesLanguageNamespace({ target_language: 'fr', memory_scope: 'global' }, {}), true);
+});
 
 test('resolveSupersededMatches replaces stale thoughts with latest thought', () => {
   const matches = [{ id: 'old', content: 'old decision', metadata: { topics: ['memory'] }, similarity: 0.91 }];
