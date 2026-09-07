@@ -54,13 +54,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Final E2E pass after constraining model reasoning/output budget.
           RESPONSE=$(curl --fail-with-body --silent --show-error \
             --request POST \
             'https://hdcpvwsndxxflbednvsq.supabase.co/functions/v1/council-e2e-runner' \
             --header "x-runner-token: $RUNNER_TOKEN" \
             --header 'content-type: application/json' \
-            --data '{"project_slug":"smart-twin-hamrouni","question":"v1-architecture-and-pipeline","rounds":1}')
+            --data '{"project_slug":"smart-twin-hamrouni","question":"ai-content-brain-architecture-and-approval-ui","rounds":2}')
           printf '%s\n' "$RESPONSE" > council-e2e-result.json
           python - <<'PY'
           import json
