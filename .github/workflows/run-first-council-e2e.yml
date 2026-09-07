@@ -16,12 +16,12 @@ on:
       question:
         description: "Council debate topic/question"
         required: true
-        default: "dev-brain-conflict-resolution-mechanism compare fail-fast-before-debate versus continue-with-conflicts-and-surface-in-synthesis recommend-default-and-exceptions"
+        default: "runtime-smoke-test-st003-st004-memory-retrieval-and-governance"
         type: string
       rounds:
         description: "Council debate rounds"
         required: true
-        default: "2"
+        default: "1"
         type: string
 
 permissions:
@@ -32,8 +32,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PROJECT_SLUG: ${{ github.event.inputs.project_slug || 'amir-dev-brain' }}
-      COUNCIL_QUESTION: ${{ github.event.inputs.question || 'dev-brain-conflict-resolution-mechanism compare fail-fast-before-debate versus continue-with-conflicts-and-surface-in-synthesis recommend-default-and-exceptions' }}
-      COUNCIL_ROUNDS: ${{ github.event.inputs.rounds || '2' }}
+      COUNCIL_QUESTION: ${{ github.event.inputs.question || 'runtime-smoke-test-st003-st004-memory-retrieval-and-governance' }}
+      COUNCIL_ROUNDS: ${{ github.event.inputs.rounds || '1' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -101,8 +101,40 @@ jobs:
           data=json.load(open('council-e2e-result.json', encoding='utf-8'))
           if not data.get('ok'):
               raise SystemExit('Council runner returned failure: '+str(data))
-          print('Council E2E completed successfully')
-          print(json.dumps(data, ensure_ascii=False))
+          text=' '.join(str(x.get('text','')) for x in data.get('result',{}).get('content',[]) if isinstance(x,dict))
+          if 'Saved to Open Brain thought:' not in text:
+              raise SystemExit('Council result did not confirm Open Brain persistence')
+          print('Council E2E completed successfully and persisted to Open Brain')
+          PY
+
+      - name: Verify metadata cache populated by retrieval
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          q="select count(*)::int as cached_rows, max(cached_at) as latest_cached_at from public.open_brain_metadata_cache;"
+          open('cache-verify-payload.json','w').write(json.dumps({'query':q}))
+          PY
+          HTTP_CODE=$(curl --silent --show-error \
+            --output cache-verify-result.json \
+            --write-out '%{http_code}' \
+            --request POST \
+            'https://api.supabase.com/v1/projects/hdcpvwsndxxflbednvsq/database/query' \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            --header 'content-type: application/json' \
+            --data @cache-verify-payload.json)
+          cat cache-verify-result.json
+          case "$HTTP_CODE" in 2*) ;; *) echo "Unexpected cache verification HTTP $HTTP_CODE"; exit 1 ;; esac
+          python - <<'PY'
+          import json
+          data=json.load(open('cache-verify-result.json'))
+          rows=data if isinstance(data,list) else data.get('result',data.get('data',[]))
+          if not rows or int(rows[0].get('cached_rows') or 0) < 1:
+              raise SystemExit('Metadata cache was not populated by governed retrieval: '+str(data))
+          print('Metadata cache populated:', rows[0])
           PY
 
       - name: Upload council result artifact
@@ -113,6 +145,7 @@ jobs:
           path: |
             council-payload.json
             council-e2e-result.json
+            cache-verify-result.json
           if-no-files-found: warn
 
       - name: Remove temporary runner secret
