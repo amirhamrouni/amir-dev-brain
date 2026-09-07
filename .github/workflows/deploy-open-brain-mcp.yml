@@ -10,6 +10,9 @@ on:
       - "scripts/patch-council-orchestrator.mjs"
       - "scripts/patch-council-reasoning.mjs"
       - "scripts/patch-council-free-tier.mjs"
+      - "scripts/patch-st003-retrieval.mjs"
+      - "scripts/st003-retrieval-core.mjs"
+      - "tests/st003-retrieval-core.test.mjs"
       - "supabase/**"
 
 permissions:
@@ -22,10 +25,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Run ST-003 retrieval unit tests
+        run: node --test tests/st003-retrieval-core.test.mjs
+
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.116.0
 
       - name: Prepare pinned OB1 MCP function
         shell: bash
@@ -55,6 +61,9 @@ jobs:
       - name: Switch council to zero-cost free-tier models
         run: node scripts/patch-council-free-tier.mjs supabase/functions/open-brain-mcp/index.ts
 
+      - name: Apply ST-003 governed memory retrieval
+        run: node scripts/patch-st003-retrieval.mjs supabase/functions/open-brain-mcp/index.ts
+
       - name: Normalize generated TypeScript
         shell: bash
         run: |
@@ -75,6 +84,10 @@ jobs:
           grep -q 'github_repo_state' supabase/functions/open-brain-mcp/index.ts
           grep -q 'github_fetch_file' supabase/functions/open-brain-mcp/index.ts
           grep -q 'amir_council_debate' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'amir_retrieve_memory_context' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'retrieveSt003Context(topic, safe, 8)' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'superseded_by' supabase/functions/open-brain-mcp/index.ts
+          grep -q '\[CONFLICT_FLAG topics=' supabase/functions/open-brain-mcp/index.ts
           grep -q 'google/gemini-2.0-flash-exp:free' supabase/functions/open-brain-mcp/index.ts
           grep -q 'qwen/qwen-2.5-coder-32b-instruct:free' supabase/functions/open-brain-mcp/index.ts
           grep -q 'max_tokens: 1800' supabase/functions/open-brain-mcp/index.ts
