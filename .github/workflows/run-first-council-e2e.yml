@@ -61,7 +61,7 @@ jobs:
             'https://hdcpvwsndxxflbednvsq.supabase.co/functions/v1/council-e2e-runner' \
             --header "x-runner-token: $RUNNER_TOKEN" \
             --header 'content-type: application/json' \
-            --data '{"project_slug":"smart-twin-hamrouni","question":"ai-content-brain-architecture-and-approval-ui","rounds":1}')
+            --data '{"project_slug":"smart-twin-hamrouni","question":"ai-content-brain-architecture-and-approval-ui","rounds":2}')
           echo "Council runner HTTP $HTTP_CODE"
           cat council-e2e-result.json
           python - <<'PY'
@@ -71,7 +71,7 @@ jobs:
           if not data.get('ok'):
               raise SystemExit('Council runner returned failure: '+str(data))
           print('Council E2E completed successfully')
-          print(json.dumps(data, ensure_ascii=False)[:16000])
+          print(json.dumps(data, ensure_ascii=False))
           PY
 
       - name: Upload council result artifact
