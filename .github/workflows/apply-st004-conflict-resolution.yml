@@ -54,15 +54,26 @@ jobs:
           python - <<'PY'
           import json
           query = """
-          select column_name from information_schema.columns
-          where table_schema='public' and table_name='thoughts'
-            and column_name in ('conflict_source','resolution_status','blocked_action')
-          order by column_name;
-          select to_regclass('public.open_brain_metadata_cache') as cache_table;
-          select tgname from pg_trigger
-          where tgrelid='public.thoughts'::regclass
-            and tgname='trg_invalidate_open_brain_metadata_cache'
-            and not tgisinternal;
+          select
+            exists(
+              select 1 from information_schema.columns
+              where table_schema='public' and table_name='thoughts' and column_name='conflict_source'
+            ) as conflict_source_exists,
+            exists(
+              select 1 from information_schema.columns
+              where table_schema='public' and table_name='thoughts' and column_name='resolution_status'
+            ) as resolution_status_exists,
+            exists(
+              select 1 from information_schema.columns
+              where table_schema='public' and table_name='thoughts' and column_name='blocked_action'
+            ) as blocked_action_exists,
+            to_regclass('public.open_brain_metadata_cache')::text as cache_table,
+            exists(
+              select 1 from pg_trigger
+              where tgrelid='public.thoughts'::regclass
+                and tgname='trg_invalidate_open_brain_metadata_cache'
+                and not tgisinternal
+            ) as trigger_exists;
           """
           open('verify-payload.json','w').write(json.dumps({'query':query}))
           PY
@@ -76,11 +87,22 @@ jobs:
             --data @verify-payload.json)
           cat verify-result.json
           case "$HTTP_CODE" in 2*) ;; *) echo "Unexpected verification HTTP $HTTP_CODE"; exit 1 ;; esac
-          grep -q 'conflict_source' verify-result.json
-          grep -q 'resolution_status' verify-result.json
-          grep -q 'blocked_action' verify-result.json
-          grep -q 'open_brain_metadata_cache' verify-result.json
-          grep -q 'trg_invalidate_open_brain_metadata_cache' verify-result.json
+          python - <<'PY'
+          import json
+          data=json.load(open('verify-result.json'))
+          rows=data if isinstance(data, list) else data.get('result', data.get('data', []))
+          if not rows or not isinstance(rows[0], dict):
+              raise SystemExit('ST-004 verification returned no row: '+str(data))
+          row=rows[0]
+          required=['conflict_source_exists','resolution_status_exists','blocked_action_exists','trigger_exists']
+          missing=[k for k in required if row.get(k) is not True]
+          if missing:
+              raise SystemExit('ST-004 verification failed fields '+str(missing)+': '+str(row))
+          cache=str(row.get('cache_table') or '')
+          if cache not in ('open_brain_metadata_cache','public.open_brain_metadata_cache'):
+              raise SystemExit('ST-004 metadata cache table verification failed: '+str(row))
+          print('Verified ST-004 thoughts metadata columns, metadata cache table, and invalidation trigger')
+          PY
 
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
