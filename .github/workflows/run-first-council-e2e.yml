@@ -11,12 +11,12 @@ on:
       project_slug:
         description: "Amir Dev Brain project slug"
         required: true
-        default: "amir-dev-brain"
+        default: "smart-twin-hamrouni"
         type: string
       question:
         description: "Council debate topic/question"
         required: true
-        default: "open-brain-memory-retrieval-and-context-optimization"
+        default: "ai-content-generator-adapter-design"
         type: string
       rounds:
         description: "Council debate rounds"
@@ -31,8 +31,8 @@ jobs:
   council-e2e:
     runs-on: ubuntu-latest
     env:
-      PROJECT_SLUG: ${{ github.event.inputs.project_slug || 'amir-dev-brain' }}
-      COUNCIL_QUESTION: ${{ github.event.inputs.question || 'open-brain-memory-retrieval-and-context-optimization' }}
+      PROJECT_SLUG: ${{ github.event.inputs.project_slug || 'smart-twin-hamrouni' }}
+      COUNCIL_QUESTION: ${{ github.event.inputs.question || 'ai-content-generator-adapter-design' }}
       COUNCIL_ROUNDS: ${{ github.event.inputs.rounds || '2' }}
     steps:
       - name: Checkout
@@ -119,6 +119,7 @@ jobs:
         if: always()
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        shell: bash
         run: |
           if command -v supabase >/dev/null 2>&1; then
             supabase secrets unset COUNCIL_RUNNER_TOKEN --project-ref hdcpvwsndxxflbednvsq || true
