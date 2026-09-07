@@ -1,52 +1,124 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import type { CouncilEvent, CouncilSynthesis } from "@/types/council";
+import { useCallback, useMemo, useState } from "react";
+import type { CouncilEvent, CouncilSynthesis, CouncilMessage } from "@/types/council";
 
-export type RealtimeState = "mock" | "connecting" | "connected" | "error";
+export type RealtimeState = "idle" | "ready" | "running" | "error";
 
-function isCouncilEvent(value: unknown): value is CouncilEvent {
-  if (!value || typeof value !== "object" || !("type" in value)) return false;
-  const type = (value as { type?: unknown }).type;
-  if (type === "message") return "message" in value;
-  if (type === "conflict") return "flag" in value;
-  if (type === "synthesis") return "synthesis" in value;
-  return false;
+const COUNCIL_API = "https://hdcpvwsndxxflbednvsq.supabase.co/functions/v1/council-e2e-runner";
+
+function cleanProviderTitle(raw: string) {
+  return raw.replace(/^#+\s*/, "").replace(/\s*\([^)]*\)\s*$/, "").trim();
 }
 
-export function useCouncilRealtime(initialEvents: CouncilEvent[]) {
-  const [events, setEvents] = useState<CouncilEvent[]>(initialEvents);
-  const [state, setState] = useState<RealtimeState>("mock");
+function firstParagraph(text: string) {
+  return text.split(/\n\s*\n/).map((part) => part.trim()).find(Boolean) || text.trim();
+}
 
-  useEffect(() => {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) {
-      setState("mock");
+function parseCouncilTranscript(text: string): CouncilEvent[] {
+  const cleaned = text.replace(/\nSaved to Open Brain thought:[\s\S]*$/i, "").trim();
+  const matches = [...cleaned.matchAll(/^##\s+(Gemini Round \d+|OpenAI Round \d+|Council Synthesis)(?:\s+\(([^)]+)\))?\s*$/gmi)];
+  const now = () => new Date().toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit" });
+  const events: CouncilEvent[] = [];
+
+  matches.forEach((match, index) => {
+    const start = (match.index || 0) + match[0].length;
+    const end = index + 1 < matches.length ? (matches[index + 1].index || cleaned.length) : cleaned.length;
+    const body = cleaned.slice(start, end).trim();
+    const title = cleanProviderTitle(match[1]);
+    const provider = match[2]?.trim();
+
+    if (/Council Synthesis/i.test(title)) {
+      const summary = firstParagraph(body);
+      const synthesis: CouncilSynthesis = {
+        id: `synthesis-${Date.now()}`,
+        title: "خلاصة المجلس",
+        summary,
+        recommendation: body,
+        confidence: 96,
+      };
+      events.push({ type: "synthesis", synthesis });
       return;
     }
 
-    setState("connecting");
-    const channelName = process.env.NEXT_PUBLIC_COUNCIL_CHANNEL || "amir-dev-brain:council";
-    const channel = supabase
-      .channel(channelName, { config: { broadcast: { self: true } } })
-      .on("broadcast", { event: "council_event" }, ({ payload }) => {
-        if (isCouncilEvent(payload)) {
-          setEvents((current) => [...current, payload]);
-        }
-      })
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") setState("connected");
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") setState("error");
-      });
-
-    return () => {
-      void supabase.removeChannel(channel);
+    const isGemini = /^Gemini/i.test(title);
+    const round = title.match(/(\d+)/)?.[1] || String(index + 1);
+    const message: CouncilMessage = {
+      id: `council-${index}-${Date.now()}`,
+      modelLabel: isGemini ? "نموذج جيميني" : "نموذج OpenAI",
+      tone: isGemini ? "blue" : "red",
+      title: `الجولة ${round}${provider ? ` · ${provider}` : ""}`,
+      content: body,
+      timestamp: now(),
     };
-  }, []);
+    events.push({ type: "message", message });
 
-  const injectMockEvent = useCallback((event: CouncilEvent) => {
-    setEvents((current) => [...current, event]);
+    if (/\b(disagree|conflict|risk|ضعف|خطر|تعارض|أختلف)\b/i.test(body)) {
+      events.push({
+        type: "conflict",
+        flag: {
+          id: `conflict-${index}-${Date.now()}`,
+          code: "COUNCIL_CONFLICT",
+          detail: "رُصد اعتراض أو خطر يحتاج للمراجعة داخل هذه الجولة.",
+          timestamp: now(),
+        },
+      });
+    }
+  });
+
+  if (!events.length && cleaned) {
+    events.push({
+      type: "message",
+      message: {
+        id: `council-result-${Date.now()}`,
+        modelLabel: "محرك المجلس",
+        tone: "blue",
+        title: "نتيجة النقاش",
+        content: cleaned,
+        timestamp: now(),
+      },
+    });
+  }
+
+  return events;
+}
+
+export function useCouncilRealtime() {
+  const [events, setEvents] = useState<CouncilEvent[]>([]);
+  const [state, setState] = useState<RealtimeState>("idle");
+  const [error, setError] = useState<string | null>(null);
+
+  const runDebate = useCallback(async ({ project, question, rounds, accessKey }: { project: string; question: string; rounds: number; accessKey: string }) => {
+    if (!accessKey.trim()) throw new Error("أدخل مفتاح الوصول الخاص أولاً.");
+    setState("running");
+    setError(null);
+    setEvents([]);
+
+    try {
+      const response = await fetch(COUNCIL_API, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-amir-key": accessKey.trim(),
+        },
+        body: JSON.stringify({ project_slug: project.trim() || "amir-dev-brain", question, rounds }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data?.ok) throw new Error(data?.error || `HTTP ${response.status}`);
+      const text = (data?.result?.content || [])
+        .filter((item: unknown) => item && typeof item === "object" && "text" in item)
+        .map((item: { text?: unknown }) => String(item.text || ""))
+        .join("\n");
+      const parsed = parseCouncilTranscript(text);
+      setEvents(parsed);
+      setState("ready");
+      return parsed;
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      setError(message);
+      setState("error");
+      throw cause;
+    }
   }, []);
 
   const latestSynthesis = useMemo<CouncilSynthesis | null>(() => {
@@ -57,5 +129,5 @@ export function useCouncilRealtime(initialEvents: CouncilEvent[]) {
     return null;
   }, [events]);
 
-  return { events, latestSynthesis, state, injectMockEvent };
+  return { events, latestSynthesis, state, error, runDebate };
 }
