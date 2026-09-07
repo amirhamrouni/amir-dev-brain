@@ -16,12 +16,12 @@ on:
       question:
         description: "Council debate topic/question"
         required: true
-        default: "runtime-smoke-test-st003-st004-memory-retrieval-and-governance"
+        default: "english-twin-architecture-and-memory-separation"
         type: string
       rounds:
         description: "Council debate rounds"
         required: true
-        default: "1"
+        default: "2"
         type: string
 
 permissions:
@@ -32,8 +32,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PROJECT_SLUG: ${{ github.event.inputs.project_slug || 'amir-dev-brain' }}
-      COUNCIL_QUESTION: ${{ github.event.inputs.question || 'runtime-smoke-test-st003-st004-memory-retrieval-and-governance' }}
-      COUNCIL_ROUNDS: ${{ github.event.inputs.rounds || '1' }}
+      COUNCIL_QUESTION: ${{ github.event.inputs.question || 'english-twin-architecture-and-memory-separation' }}
+      COUNCIL_ROUNDS: ${{ github.event.inputs.rounds || '2' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
