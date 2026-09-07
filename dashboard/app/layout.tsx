@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Amir Dev Brain — Council Dashboard",
-  description: "Live architectural debate, conflict review and synthesis approval console.",
+  title: "عقل أمير التطويري — مجلس الذكاء الاصطناعي",
+  description: "لوحة عربية حيّة لنقاش النماذج، كشف التعارضات، ومراجعة خلاصة المجلس.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="ar" dir="rtl">
       <body>{children}</body>
     </html>
   );
