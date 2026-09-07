@@ -16,7 +16,7 @@ on:
       question:
         description: "Council debate topic/question"
         required: true
-        default: "dev-brain-conflict-resolution-mechanism - Decide how Council Runtime should handle CONFLICT_FLAG from ST-003 retrieval: fail-fast and require Amir before debate, or continue with both conflicting memories and force the final synthesis to surface the unresolved conflict for Amir. Compare correctness, autonomy, cloud execution, auditability, hallucination risk and deadlock risk. Recommend one default and narrow override conditions."
+        default: "dev-brain-conflict-resolution-mechanism compare fail-fast-before-debate versus continue-with-conflicts-and-surface-in-synthesis recommend-default-and-exceptions"
         type: string
       rounds:
         description: "Council debate rounds"
@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PROJECT_SLUG: ${{ github.event.inputs.project_slug || 'amir-dev-brain' }}
-      COUNCIL_QUESTION: ${{ github.event.inputs.question || 'dev-brain-conflict-resolution-mechanism - Decide how Council Runtime should handle CONFLICT_FLAG from ST-003 retrieval: fail-fast and require Amir before debate, or continue with both conflicting memories and force the final synthesis to surface the unresolved conflict for Amir. Compare correctness, autonomy, cloud execution, auditability, hallucination risk and deadlock risk. Recommend one default and narrow override conditions.' }}
+      COUNCIL_QUESTION: ${{ github.event.inputs.question || 'dev-brain-conflict-resolution-mechanism compare fail-fast-before-debate versus continue-with-conflicts-and-surface-in-synthesis recommend-default-and-exceptions' }}
       COUNCIL_ROUNDS: ${{ github.event.inputs.rounds || '2' }}
     steps:
       - name: Checkout
