@@ -3,6 +3,37 @@ export function normalizeTopics(metadata = {}) {
   return [...new Set(topics.map((t) => String(t).trim().toLowerCase()).filter(Boolean))];
 }
 
+export function normalizeTargetLanguage(value) {
+  const normalized = String(value || '').trim().toLowerCase().replaceAll('_', '-');
+  return normalized || null;
+}
+
+export function normalizeMemoryScope(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized || null;
+}
+
+// Pure policy mirror of the database hard pre-filter. This is intentionally strict:
+// legacy/null-language rows do not enter a language-scoped retrieval, and a stored
+// cross_language flag only works when the caller explicitly opts in too.
+export function matchesLanguageNamespace(thought, options = {}) {
+  const requestedLanguage = normalizeTargetLanguage(options.targetLanguage);
+  const requestedScope = normalizeMemoryScope(options.memoryScope);
+  const allowCrossLanguage = options.crossLanguage === true;
+
+  if (!requestedLanguage) return requestedScope
+    ? normalizeMemoryScope(thought?.memory_scope) === requestedScope
+    : true;
+
+  const thoughtLanguage = normalizeTargetLanguage(thought?.target_language);
+  const languageMatches = thoughtLanguage === requestedLanguage;
+  const crossLanguageMatches = allowCrossLanguage && thought?.cross_language === true;
+  if (!languageMatches && !crossLanguageMatches) return false;
+
+  if (requestedScope && normalizeMemoryScope(thought?.memory_scope) !== requestedScope) return false;
+  return true;
+}
+
 export function isDecisionLike(thought) {
   const m = thought?.metadata || {};
   const authority = String(m.authority_level || '').toLowerCase();
