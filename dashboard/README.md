@@ -2,6 +2,8 @@
 
 Premium council command center built with Next.js App Router, Tailwind CSS, Motion for React and Supabase Realtime Broadcast.
 
+Approved architecture: `decisions/ADB-001_PREMIUM_COUNCIL_DASHBOARD.md`.
+
 ## Current scaffold
 
 - Split-screen desktop layout: governed input/context on the left, live debate thread on the right.
@@ -38,7 +40,7 @@ Never place a Supabase service-role key in `NEXT_PUBLIC_*` variables.
 ## Local run
 
 ```bash
-npm install
+npm ci
 npm run typecheck
 npm run build
 npm run dev
