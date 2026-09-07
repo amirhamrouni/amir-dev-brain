@@ -1,0 +1,146 @@
+name: Apply English Twin Language Namespace
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/migrations/20260907213000_english_twin_language_namespace.sql"
+      - ".github/workflows/apply-english-twin-language-namespace.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  migrate-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply language namespace migration
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          sql = Path('supabase/migrations/20260907213000_english_twin_language_namespace.sql').read_text()
+          Path('migration-payload.json').write_text(json.dumps({'query': sql}), encoding='utf-8')
+          PY
+          HTTP_CODE=$(curl --silent --show-error \
+            --output migration-result.json \
+            --write-out '%{http_code}' \
+            --request POST \
+            'https://api.supabase.com/v1/projects/hdcpvwsndxxflbednvsq/database/query' \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            --header 'content-type: application/json' \
+            --data @migration-payload.json)
+          cat migration-result.json
+          case "$HTTP_CODE" in 2*) ;; *) echo "Unexpected migration HTTP $HTTP_CODE"; exit 1 ;; esac
+
+      - name: Verify namespace schema and hard-prefilter RPC
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > verify-payload.json <<'JSON'
+          {"query":"select (select count(*) from information_schema.columns where table_schema='public' and table_name='thoughts' and column_name in ('target_language','memory_scope','cross_language'))::int as namespace_columns, to_regprocedure('public.match_thoughts_namespaced(vector,text,text,boolean,double precision,integer,jsonb)') is not null as rpc_exists, position('MATERIALIZED' in pg_get_functiondef('public.match_thoughts_namespaced(vector,text,text,boolean,double precision,integer,jsonb)'::regprocedure)) > 0 as hard_prefilter_materialized;"}
+          JSON
+          HTTP_CODE=$(curl --silent --show-error \
+            --output verify-result.json \
+            --write-out '%{http_code}' \
+            --request POST \
+            'https://api.supabase.com/v1/projects/hdcpvwsndxxflbednvsq/database/query' \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            --header 'content-type: application/json' \
+            --data @verify-payload.json)
+          cat verify-result.json
+          case "$HTTP_CODE" in 2*) ;; *) echo "Unexpected verification HTTP $HTTP_CODE"; exit 1 ;; esac
+          python - <<'PY'
+          import json
+          data=json.load(open('verify-result.json'))
+          rows=data if isinstance(data,list) else data.get('result',data.get('data',[]))
+          if not rows:
+              raise SystemExit('No namespace verification rows: '+str(data))
+          row=rows[0]
+          if int(row.get('namespace_columns') or 0) != 3 or row.get('rpc_exists') is not True or row.get('hard_prefilter_materialized') is not True:
+              raise SystemExit('Namespace schema/RPC verification failed: '+str(row))
+          print('Verified three namespace columns and MATERIALIZED hard-prefilter RPC')
+          PY
+
+      - name: Execute database namespace isolation smoke test
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          sql = r'''
+          DO $$
+          DECLARE
+            v vector(1536);
+            en_id uuid;
+            nl_id uuid;
+            cross_id uuid;
+            n integer;
+          BEGIN
+            v := ('[1,' || rtrim(repeat('0,', 1535), ',') || ']')::vector(1536);
+
+            INSERT INTO public.thoughts(content, embedding, metadata, target_language, memory_scope, cross_language)
+            VALUES ('__namespace_smoke_en__', v, '{"project":"amir-dev-brain"}'::jsonb, 'en', 'english-twin', false)
+            RETURNING id INTO en_id;
+
+            INSERT INTO public.thoughts(content, embedding, metadata, target_language, memory_scope, cross_language)
+            VALUES ('__namespace_smoke_nl__', v, '{"project":"amir-dev-brain"}'::jsonb, 'nl', 'english-twin', false)
+            RETURNING id INTO nl_id;
+
+            INSERT INTO public.thoughts(content, embedding, metadata, target_language, memory_scope, cross_language)
+            VALUES ('__namespace_smoke_cross__', v, '{"project":"amir-dev-brain"}'::jsonb, 'nl', 'english-twin', true)
+            RETURNING id INTO cross_id;
+
+            SELECT count(*) INTO n
+            FROM public.match_thoughts_namespaced(v, 'en', 'english-twin', false, 0.5, 10, '{}'::jsonb)
+            WHERE id IN (en_id, nl_id, cross_id);
+            IF n <> 1 THEN
+              RAISE EXCEPTION 'hard language prefilter failed, expected 1 row, got %', n;
+            END IF;
+
+            SELECT count(*) INTO n
+            FROM public.match_thoughts_namespaced(v, 'en', 'english-twin', true, 0.5, 10, '{}'::jsonb)
+            WHERE id IN (en_id, nl_id, cross_id);
+            IF n <> 2 THEN
+              RAISE EXCEPTION 'explicit cross-language opt-in failed, expected 2 rows, got %', n;
+            END IF;
+
+            DELETE FROM public.thoughts WHERE id IN (en_id, nl_id, cross_id);
+          END $$;
+          '''
+          open('smoke-payload.json','w').write(json.dumps({'query':sql}))
+          PY
+          HTTP_CODE=$(curl --silent --show-error \
+            --output smoke-result.json \
+            --write-out '%{http_code}' \
+            --request POST \
+            'https://api.supabase.com/v1/projects/hdcpvwsndxxflbednvsq/database/query' \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            --header 'content-type: application/json' \
+            --data @smoke-payload.json)
+          cat smoke-result.json
+          case "$HTTP_CODE" in 2*) ;; *) echo "Namespace smoke test failed HTTP $HTTP_CODE"; exit 1 ;; esac
+          echo "Namespace isolation smoke test passed"
+
+      - name: Upload migration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: english-twin-language-namespace-evidence
+          path: |
+            migration-result.json
+            verify-result.json
+            smoke-result.json
+          if-no-files-found: warn
