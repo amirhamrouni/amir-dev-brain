@@ -67,6 +67,8 @@ CREATE INDEX IF NOT EXISTS idx_thoughts_cross_language_scope
 
 -- Additive RPC: keep upstream match_thoughts untouched for backwards compatibility.
 -- MATERIALIZED makes the namespace candidate set explicit before pgvector distance work.
+-- Note: Amir's live OB1 thoughts table does not expose a dedicated source column;
+-- source/provenance remains in metadata, so this RPC mirrors the live schema.
 CREATE OR REPLACE FUNCTION public.match_thoughts_namespaced(
   query_embedding vector(1536),
   p_target_language TEXT,
@@ -81,7 +83,6 @@ RETURNS TABLE (
   content TEXT,
   metadata JSONB,
   similarity FLOAT,
-  source TEXT,
   created_at TIMESTAMPTZ,
   target_language TEXT,
   memory_scope TEXT,
@@ -110,7 +111,6 @@ AS $$
     t.content,
     t.metadata,
     (1 - (t.embedding <=> query_embedding))::FLOAT AS similarity,
-    t.source,
     t.created_at,
     t.target_language,
     t.memory_scope,
