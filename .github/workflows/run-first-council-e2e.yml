@@ -41,7 +41,7 @@ jobs:
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.116.0
 
       - name: Generate one-shot runner token
         id: token
@@ -113,11 +113,13 @@ jobs:
           path: |
             council-payload.json
             council-e2e-result.json
-          if-no-files-found: error
+          if-no-files-found: warn
 
       - name: Remove temporary runner secret
         if: always()
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          supabase secrets unset COUNCIL_RUNNER_TOKEN --project-ref hdcpvwsndxxflbednvsq || true
+          if command -v supabase >/dev/null 2>&1; then
+            supabase secrets unset COUNCIL_RUNNER_TOKEN --project-ref hdcpvwsndxxflbednvsq || true
+          fi
