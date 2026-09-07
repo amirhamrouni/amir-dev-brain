@@ -13,7 +13,7 @@ Amir Dev Brain is Amir's shared cross-model development memory and governance la
 ## Source-of-truth hierarchy
 1. Actual target GitHub repository for current code, commits, CI, releases and deployment state.
 2. `projects/*.md` for structured project memory and verified checkpoints.
-3. `decisions/APPROVED_DECISIONS.md` for Amir-approved authoritative decisions.
+3. `decisions/APPROVED_DECISIONS.md` and standalone approved decision records under `decisions/` for Amir-approved authoritative decisions.
 4. `council/*.md` for model opinions only.
 5. `PROJECTS.md` for the registry.
 
@@ -35,13 +35,44 @@ Amir-specific capabilities include:
 - `amir_council_debate`
 
 ## Council architecture
-`amir_council_debate` runs model-to-model debate server-side through OpenRouter, persists the transcript and synthesis into Open Brain, and labels the result as model opinion/council recommendation until Amir explicitly approves it.
+`amir_council_debate` runs model-to-model debate server-side through OpenRouter/provider adapters, persists the transcript and synthesis into Open Brain, and labels the result as model opinion/council recommendation until Amir explicitly approves it.
 
 Current council routing policy:
-- zero-cost OpenRouter free-tier routing only for council debates where configured
+- zero-cost provider routing where configured
+- provider fallback is allowed so rate limits do not stop the workflow
 - long enough response budgets to avoid truncated architectural discussions
 - multi-round debate supported
 - persisted synthesis required before reporting success
+
+## Premium Council Dashboard — approved and implemented scaffold
+Approved decision: `decisions/ADB-001_PREMIUM_COUNCIL_DASHBOARD.md`.
+
+The dashboard is implemented as an independent frontend under `dashboard/` so the operator UI can evolve without rewriting Open Brain MCP or existing Supabase Edge Functions.
+
+Approved frontend architecture:
+- Next.js App Router
+- Tailwind CSS
+- Motion for React
+- Supabase Realtime Broadcast
+- split-screen desktop layout: Input/Context on the left, Live Debate Thread on the right
+- blue Architecture Model message component
+- red Adversarial Model message component
+- animated `[CONFLICT_FLAG]` governance badge
+- Synthesis panel with explicit Amir Approve/Reject interaction
+- mock mode when public Supabase realtime env vars are absent
+- responsive mobile layout and reduced-motion support
+
+Realtime contract:
+- channel defaults to `amir-dev-brain:council`
+- Broadcast event: `council_event`
+- supported payload classes: `message`, `conflict`, `synthesis`
+- only public Supabase browser credentials are allowed in `NEXT_PUBLIC_*`; privileged keys stay server-side
+
+Verification:
+- dependency graph is locked under `dashboard/package-lock.json`
+- permanent workflow `.github/workflows/dashboard-ci.yml` uses `npm ci`
+- TypeScript typecheck passed
+- Next.js production build passed
 
 ## Current architecture question
 Topic: `open-brain-memory-retrieval-and-context-optimization`.
