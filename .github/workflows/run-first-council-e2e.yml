@@ -16,7 +16,7 @@ on:
       question:
         description: "Council debate topic/question"
         required: true
-        default: "english-twin-architecture-and-memory-separation"
+        default: "English Twin production release hardening for amirhamrouni/lessonss at commit b5f5e486dd603461f2196fa5c6be4f05ea7aaed6. Audit current architecture and propose the smallest highest-value changes to publish safely with near-zero avoidable errors. Focus on security, Firebase/Auth/Firestore isolation, AI API authentication and abuse controls, privacy/data deletion, CSP and browser headers, dependency and supply-chain safety, branch protection and required CI, deterministic installs, tests and browser E2E, runtime observability, rollback/recovery, PWA/mobile readiness, accessibility and performance. Preserve all working features and do not rebuild. Rank recommendations as MUST-FIX before publication, SHOULD-FIX, and POST-RELEASE."
         type: string
       rounds:
         description: "Council debate rounds"
@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PROJECT_SLUG: ${{ github.event.inputs.project_slug || 'amir-dev-brain' }}
-      COUNCIL_QUESTION: ${{ github.event.inputs.question || 'english-twin-architecture-and-memory-separation' }}
+      COUNCIL_QUESTION: ${{ github.event.inputs.question || 'English Twin production release hardening for amirhamrouni/lessonss at commit b5f5e486dd603461f2196fa5c6be4f05ea7aaed6. Audit current architecture and propose the smallest highest-value changes to publish safely with near-zero avoidable errors. Focus on security, Firebase/Auth/Firestore isolation, AI API authentication and abuse controls, privacy/data deletion, CSP and browser headers, dependency and supply-chain safety, branch protection and required CI, deterministic installs, tests and browser E2E, runtime observability, rollback/recovery, PWA/mobile readiness, accessibility and performance. Preserve all working features and do not rebuild. Rank recommendations as MUST-FIX before publication, SHOULD-FIX, and POST-RELEASE.' }}
       COUNCIL_ROUNDS: ${{ github.event.inputs.rounds || '2' }}
     steps:
       - name: Checkout
