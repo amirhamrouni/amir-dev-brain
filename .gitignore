@@ -3,6 +3,11 @@
 .env.*
 !.env.example
 
+# Node / Next.js dashboard
+node_modules/
+.next/
+out/
+
 # Local Claude/Codex state
 .claude/settings.local.json
 .codex/
