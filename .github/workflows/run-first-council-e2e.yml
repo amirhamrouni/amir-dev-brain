@@ -16,7 +16,7 @@ on:
       question:
         description: "Council debate topic/question"
         required: true
-        default: "dev-brain-conflict-resolution-mechanism. When the Council Runtime encounters a [CONFLICT_FLAG] during ST-003 memory retrieval, what is the architecturally correct behavior? Compare two explicit policies: (1) fail-fast, stop the session immediately and emit an interactive CLI prompt asking Amir to resolve the conflict before models may continue; versus (2) continue the debate with the conflicting memories included and clearly marked, require both analytical and engineering sides to reason with the conflict visible, and force the final Synthesis to surface the unresolved conflict for Amir to decide later. Evaluate safety, correctness, autonomy, UX, non-interactive/cloud execution, auditability, risk of model hallucination, risk of deadlock, and how this should integrate with ST-003 Flag & Include. Recommend one default policy and define any narrow conditions where the other policy should override. Do not discuss Smart Twin content generation or publishing. Use free OpenRouter routing only."
+        default: "dev-brain-conflict-resolution-mechanism - Decide how Council Runtime should handle CONFLICT_FLAG from ST-003 retrieval: fail-fast and require Amir before debate, or continue with both conflicting memories and force the final synthesis to surface the unresolved conflict for Amir. Compare correctness, autonomy, cloud execution, auditability, hallucination risk and deadlock risk. Recommend one default and narrow override conditions."
         type: string
       rounds:
         description: "Council debate rounds"
@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PROJECT_SLUG: ${{ github.event.inputs.project_slug || 'amir-dev-brain' }}
-      COUNCIL_QUESTION: ${{ github.event.inputs.question || 'dev-brain-conflict-resolution-mechanism. When the Council Runtime encounters a [CONFLICT_FLAG] during ST-003 memory retrieval, what is the architecturally correct behavior? Compare two explicit policies: (1) fail-fast, stop the session immediately and emit an interactive CLI prompt asking Amir to resolve the conflict before models may continue; versus (2) continue the debate with the conflicting memories included and clearly marked, require both analytical and engineering sides to reason with the conflict visible, and force the final Synthesis to surface the unresolved conflict for Amir to decide later. Evaluate safety, correctness, autonomy, UX, non-interactive/cloud execution, auditability, risk of model hallucination, risk of deadlock, and how this should integrate with ST-003 Flag & Include. Recommend one default policy and define any narrow conditions where the other policy should override. Do not discuss Smart Twin content generation or publishing. Use free OpenRouter routing only.' }}
+      COUNCIL_QUESTION: ${{ github.event.inputs.question || 'dev-brain-conflict-resolution-mechanism - Decide how Council Runtime should handle CONFLICT_FLAG from ST-003 retrieval: fail-fast and require Amir before debate, or continue with both conflicting memories and force the final synthesis to surface the unresolved conflict for Amir. Compare correctness, autonomy, cloud execution, auditability, hallucination risk and deadlock risk. Recommend one default and narrow override conditions.' }}
       COUNCIL_ROUNDS: ${{ github.event.inputs.rounds || '2' }}
     steps:
       - name: Checkout
