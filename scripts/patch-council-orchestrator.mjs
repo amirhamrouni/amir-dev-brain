@@ -7,41 +7,134 @@ if (!src.includes(marker)) throw new Error('OB1 council patch marker not found')
 
 const injected = String.raw`
   // --- Autonomous Amir AI Council orchestrator ---
-  async function councilChat(models: string[], messages: Array<{role: string; content: string}>): Promise<{model: string; text: string}> {
-    let lastError = "unknown";
-    for (const model of models) {
-      try {
-        const r = await fetch(OPENROUTER_BASE + "/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: "Bearer " + OPENROUTER_API_KEY,
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://github.com/amirhamrouni/amir-dev-brain",
-            "X-Title": "Amir Dev Brain Council"
-          },
-          body: JSON.stringify({
-            model,
-            temperature: 0.2,
-            max_tokens: 1200,
-            messages
-          })
-        });
-        if (!r.ok) {
-          lastError = model + ": " + r.status + " " + (await r.text());
-          continue;
+  // GenerationAdapter: OpenRouter key rotation -> direct Google AI Studio fallback.
+  // Compatible with the existing single-key secrets and optional comma-separated key pools.
+  function generationAdapterKeys(poolName: string, singleName: string): string[] {
+    const pooled = String(Deno.env.get(poolName) || '')
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
+    const single = String(Deno.env.get(singleName) || '').trim();
+    return Array.from(new Set([...pooled, ...(single ? [single] : [])]));
+  }
+
+  function generationAdapterError(provider: string, model: string, status: number, body: string): string {
+    const compact = body.replace(/\s+/g, ' ').slice(0, 280);
+    return provider + '/' + model + ': HTTP ' + status + (compact ? ' ' + compact : '');
+  }
+
+  async function generationAdapterOpenRouter(
+    models: string[],
+    messages: Array<{role: string; content: string}>,
+  ): Promise<{model: string; text: string} | null> {
+    const keys = generationAdapterKeys('OPENROUTER_API_KEYS', 'OPENROUTER_API_KEY');
+    if (!keys.length) return null;
+    const errors: string[] = [];
+
+    for (const key of keys) {
+      for (const model of models) {
+        try {
+          const r = await fetch(OPENROUTER_BASE + "/chat/completions", {
+            method: "POST",
+            headers: {
+              Authorization: "Bearer " + key,
+              "Content-Type": "application/json",
+              "HTTP-Referer": "https://github.com/amirhamrouni/amir-dev-brain",
+              "X-Title": "Amir Dev Brain Council"
+            },
+            body: JSON.stringify({
+              model,
+              temperature: 0.2,
+              max_tokens: 1200,
+              messages
+            })
+          });
+          const raw = await r.text();
+          if (!r.ok) {
+            errors.push(generationAdapterError('openrouter', model, r.status, raw));
+            continue;
+          }
+          const d = JSON.parse(raw);
+          const text = String(d?.choices?.[0]?.message?.content || "").trim();
+          if (!text) {
+            errors.push('openrouter/' + model + ': empty response');
+            continue;
+          }
+          return { model: 'openrouter/' + model, text };
+        } catch (e) {
+          errors.push('openrouter/' + model + ': ' + String((e as Error).message || e));
         }
-        const d = await r.json();
-        const text = String(d?.choices?.[0]?.message?.content || "").trim();
-        if (!text) {
-          lastError = model + ": empty response";
-          continue;
-        }
-        return { model, text };
-      } catch (e) {
-        lastError = model + ": " + String((e as Error).message || e);
       }
     }
-    throw new Error("Council model call failed: " + lastError);
+
+    if (errors.length) console.warn('GenerationAdapter OpenRouter exhausted:', errors.slice(-4).join(' | '));
+    return null;
+  }
+
+  async function generationAdapterGoogle(
+    messages: Array<{role: string; content: string}>,
+  ): Promise<{model: string; text: string} | null> {
+    const keys = generationAdapterKeys('GOOGLE_AI_STUDIO_API_KEYS', 'GEMINI_API_KEY');
+    if (!keys.length) return null;
+
+    const models = Array.from(new Set([
+      String(Deno.env.get('COUNCIL_GOOGLE_MODEL') || '').trim(),
+      String(Deno.env.get('GEMINI_MODEL') || '').trim(),
+      'gemini-2.5-flash',
+    ].filter(Boolean)));
+    const prompt = messages
+      .map((m) => m.role.toUpperCase() + ':\n' + m.content)
+      .join('\n\n---\n\n');
+    const errors: string[] = [];
+
+    for (const key of keys) {
+      for (const model of models) {
+        try {
+          const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent';
+          const r = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              'x-goog-api-key': key,
+            },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.2, maxOutputTokens: 1800 },
+            }),
+          });
+          const raw = await r.text();
+          if (!r.ok) {
+            errors.push(generationAdapterError('google-ai-studio', model, r.status, raw));
+            continue;
+          }
+          const d = JSON.parse(raw);
+          const text = String((d?.candidates?.[0]?.content?.parts || [])
+            .map((p: any) => String(p?.text || ''))
+            .join('\n'))
+            .trim();
+          if (!text) {
+            errors.push('google-ai-studio/' + model + ': empty response');
+            continue;
+          }
+          return { model: 'google-ai-studio/' + model, text };
+        } catch (e) {
+          errors.push('google-ai-studio/' + model + ': ' + String((e as Error).message || e));
+        }
+      }
+    }
+
+    if (errors.length) console.warn('GenerationAdapter Google AI Studio exhausted:', errors.slice(-4).join(' | '));
+    return null;
+  }
+
+  async function councilChat(models: string[], messages: Array<{role: string; content: string}>): Promise<{model: string; text: string}> {
+    const openRouter = await generationAdapterOpenRouter(models, messages);
+    if (openRouter) return openRouter;
+
+    const google = await generationAdapterGoogle(messages);
+    if (google) return google;
+
+    throw new Error('Council generation failed: all configured OpenRouter keys and Google AI Studio keys/providers were exhausted or unavailable.');
   }
 
   async function saveCouncilThought(content: string, projectSlug: string): Promise<string> {
@@ -82,7 +175,7 @@ const injected = String.raw`
     "amir_council_debate",
     {
       title: "Run Autonomous Amir AI Council Debate",
-      description: "Run a server-side debate between Gemini and an OpenAI council model using Amir Dev Brain project context and stored council opinions, then persist the debate to Open Brain. Use this when Amir wants models to compare, challenge, or unify recommendations without manual copy/paste between chat apps.",
+      description: "Run a server-side architectural debate using Amir Dev Brain context and persist its synthesis to Open Brain. Generation routes across configured OpenRouter keys with direct Google AI Studio fallback.",
       annotations: { readOnlyHint: false, openWorldHint: true, destructiveHint: false, idempotentHint: false },
       inputSchema: {
         project_slug: z.string().describe("Project slug, e.g. smart-twin-hamrouni"),
@@ -165,4 +258,4 @@ const injected = String.raw`
 
 src = src.replace(marker, injected + marker);
 fs.writeFileSync(target, src);
-console.log('Patched Open Brain MCP with autonomous Amir AI Council orchestrator');
+console.log('Patched Open Brain MCP with autonomous Amir AI Council orchestrator and multi-provider GenerationAdapter');
