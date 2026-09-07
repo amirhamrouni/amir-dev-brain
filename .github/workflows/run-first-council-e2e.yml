@@ -1,4 +1,4 @@
-name: Run First Autonomous Council E2E
+name: Run Autonomous Council E2E
 
 on:
   push:
@@ -7,6 +7,22 @@ on:
       - ".github/workflows/run-first-council-e2e.yml"
       - "supabase/functions/council-e2e-runner/**"
   workflow_dispatch:
+    inputs:
+      project_slug:
+        description: "Amir Dev Brain project slug"
+        required: true
+        default: "amir-dev-brain"
+        type: string
+      question:
+        description: "Council debate topic/question"
+        required: true
+        default: "open-brain-memory-retrieval-and-context-optimization"
+        type: string
+      rounds:
+        description: "Council debate rounds"
+        required: true
+        default: "2"
+        type: string
 
 permissions:
   contents: read
@@ -14,6 +30,10 @@ permissions:
 jobs:
   council-e2e:
     runs-on: ubuntu-latest
+    env:
+      PROJECT_SLUG: ${{ github.event.inputs.project_slug || 'amir-dev-brain' }}
+      COUNCIL_QUESTION: ${{ github.event.inputs.question || 'open-brain-memory-retrieval-and-context-optimization' }}
+      COUNCIL_ROUNDS: ${{ github.event.inputs.rounds || '2' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,12 +68,24 @@ jobs:
             --no-verify-jwt \
             --use-api
 
-      - name: Run Smart Twin council E2E
+      - name: Run dynamic council E2E
         env:
           RUNNER_TOKEN: ${{ steps.token.outputs.token }}
         shell: bash
         run: |
           set -euo pipefail
+          python - <<'PY'
+          import json, os
+          payload = {
+              "project_slug": os.environ["PROJECT_SLUG"],
+              "question": os.environ["COUNCIL_QUESTION"],
+              "rounds": int(os.environ["COUNCIL_ROUNDS"]),
+          }
+          with open("council-payload.json", "w", encoding="utf-8") as f:
+              json.dump(payload, f, ensure_ascii=False)
+          print("Council request:", json.dumps(payload, ensure_ascii=False))
+          PY
+
           HTTP_CODE=$(curl --silent --show-error \
             --output council-e2e-result.json \
             --write-out '%{http_code}' \
@@ -61,13 +93,12 @@ jobs:
             'https://hdcpvwsndxxflbednvsq.supabase.co/functions/v1/council-e2e-runner' \
             --header "x-runner-token: $RUNNER_TOKEN" \
             --header 'content-type: application/json' \
-            --data '{"project_slug":"smart-twin-hamrouni","question":"ai-content-brain-architecture-and-approval-ui","rounds":2}')
+            --data @council-payload.json)
           echo "Council runner HTTP $HTTP_CODE"
           cat council-e2e-result.json
           python - <<'PY'
           import json
-          p='council-e2e-result.json'
-          data=json.load(open(p))
+          data=json.load(open('council-e2e-result.json', encoding='utf-8'))
           if not data.get('ok'):
               raise SystemExit('Council runner returned failure: '+str(data))
           print('Council E2E completed successfully')
@@ -78,8 +109,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: content-brain-approval-ui-council-result
-          path: council-e2e-result.json
+          name: autonomous-council-result
+          path: |
+            council-payload.json
+            council-e2e-result.json
           if-no-files-found: error
 
       - name: Remove temporary runner secret
