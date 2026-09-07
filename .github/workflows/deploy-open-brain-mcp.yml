@@ -106,9 +106,18 @@ jobs:
           grep -q 'st004ReadCachedMetadata' supabase/functions/open-brain-mcp/index.ts
           grep -q 'st004WriteCachedMetadata' supabase/functions/open-brain-mcp/index.ts
           grep -q '\[CONFLICT_FLAG topics=' supabase/functions/open-brain-mcp/index.ts
-          grep -q 'google/gemini-2.0-flash-exp:free' supabase/functions/open-brain-mcp/index.ts
-          grep -q 'qwen/qwen-2.5-coder-32b-instruct:free' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'nvidia/nemotron-3-ultra-550b-a55b:free' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'minimax/minimax-m3:free' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'openrouter/free' supabase/functions/open-brain-mcp/index.ts
           grep -q 'max_tokens: 1800' supabase/functions/open-brain-mcp/index.ts
+          if grep -q 'google/gemini-2.0-flash-exp:free' supabase/functions/open-brain-mcp/index.ts; then
+            echo 'Stale Gemini free council model remains in generated server'
+            exit 1
+          fi
+          if grep -q 'qwen/qwen-2.5-coder-32b-instruct:free' supabase/functions/open-brain-mcp/index.ts; then
+            echo 'Stale Qwen free council model remains in generated server'
+            exit 1
+          fi
           if grep -q 'openai/gpt-5.6-luna-pro' supabase/functions/open-brain-mcp/index.ts; then
             echo 'Paid OpenAI council model remains in generated server'
             exit 1
