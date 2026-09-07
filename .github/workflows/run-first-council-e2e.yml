@@ -11,12 +11,12 @@ on:
       project_slug:
         description: "Amir Dev Brain project slug"
         required: true
-        default: "smart-twin-hamrouni"
+        default: "amir-dev-brain"
         type: string
       question:
         description: "Council debate topic/question"
         required: true
-        default: "ai-content-generator-adapter-design. Design the OpenRouter AI Content Creator Adapter using retrieved ST-002 context. Require the PostgreSQL Content Brain event store, ContentBrief inputs, LearningSignal events, separate Facebook and Instagram variants, and the human approval boundary. Use a 2-step pipeline where step one loads ContentBrief plus relevant LearningSignals and generates Base Copy, and step two uses Base Copy plus compact constraints to generate Facebook copy, Instagram copy, and Image Prompt. Use free OpenRouter routing only. Specify TypeScript ports, DB reads and writes, events, structured outputs, retry and rate-limit handling, idempotency, token budgets, fallbacks, and CI tests. Explicitly state which ST-002 constraints were retrieved automatically and flag missing or conflicting memory instead of inventing it."
+        default: "dev-brain-conflict-resolution-mechanism. When the Council Runtime encounters a [CONFLICT_FLAG] during ST-003 memory retrieval, what is the architecturally correct behavior? Compare two explicit policies: (1) fail-fast, stop the session immediately and emit an interactive CLI prompt asking Amir to resolve the conflict before models may continue; versus (2) continue the debate with the conflicting memories included and clearly marked, require both analytical and engineering sides to reason with the conflict visible, and force the final Synthesis to surface the unresolved conflict for Amir to decide later. Evaluate safety, correctness, autonomy, UX, non-interactive/cloud execution, auditability, risk of model hallucination, risk of deadlock, and how this should integrate with ST-003 Flag & Include. Recommend one default policy and define any narrow conditions where the other policy should override. Do not discuss Smart Twin content generation or publishing. Use free OpenRouter routing only."
         type: string
       rounds:
         description: "Council debate rounds"
@@ -31,8 +31,8 @@ jobs:
   council-e2e:
     runs-on: ubuntu-latest
     env:
-      PROJECT_SLUG: ${{ github.event.inputs.project_slug || 'smart-twin-hamrouni' }}
-      COUNCIL_QUESTION: ${{ github.event.inputs.question || 'ai-content-generator-adapter-design. Design the OpenRouter AI Content Creator Adapter using retrieved ST-002 context. Require the PostgreSQL Content Brain event store, ContentBrief inputs, LearningSignal events, separate Facebook and Instagram variants, and the human approval boundary. Use a 2-step pipeline where step one loads ContentBrief plus relevant LearningSignals and generates Base Copy, and step two uses Base Copy plus compact constraints to generate Facebook copy, Instagram copy, and Image Prompt. Use free OpenRouter routing only. Specify TypeScript ports, DB reads and writes, events, structured outputs, retry and rate-limit handling, idempotency, token budgets, fallbacks, and CI tests. Explicitly state which ST-002 constraints were retrieved automatically and flag missing or conflicting memory instead of inventing it.' }}
+      PROJECT_SLUG: ${{ github.event.inputs.project_slug || 'amir-dev-brain' }}
+      COUNCIL_QUESTION: ${{ github.event.inputs.question || 'dev-brain-conflict-resolution-mechanism. When the Council Runtime encounters a [CONFLICT_FLAG] during ST-003 memory retrieval, what is the architecturally correct behavior? Compare two explicit policies: (1) fail-fast, stop the session immediately and emit an interactive CLI prompt asking Amir to resolve the conflict before models may continue; versus (2) continue the debate with the conflicting memories included and clearly marked, require both analytical and engineering sides to reason with the conflict visible, and force the final Synthesis to surface the unresolved conflict for Amir to decide later. Evaluate safety, correctness, autonomy, UX, non-interactive/cloud execution, auditability, risk of model hallucination, risk of deadlock, and how this should integrate with ST-003 Flag & Include. Recommend one default policy and define any narrow conditions where the other policy should override. Do not discuss Smart Twin content generation or publishing. Use free OpenRouter routing only.' }}
       COUNCIL_ROUNDS: ${{ github.event.inputs.rounds || '2' }}
     steps:
       - name: Checkout
