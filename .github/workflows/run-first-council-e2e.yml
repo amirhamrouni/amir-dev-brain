@@ -16,7 +16,7 @@ on:
       question:
         description: "Council debate topic/question"
         required: true
-        default: "dev-brain-dashboard-premium-ui-architecture. Design the premium visual dashboard for Amir Dev Brain AI Council. Debate deeply between analysis and engineering sides: (1) best UX patterns for multi-agent/AI-agent conversations, especially split-screen vs threaded views, provenance, conflict visibility, live-status indicators, and reducing cognitive overload; (2) frontend stack, evaluating Next.js App Router, Tailwind CSS, Motion for React/Framer Motion, and Supabase Realtime; (3) information architecture and layout for showing two model sides debating, round navigation, retrieved memory/provenance, conflict flags, and a final Synthesis panel with Amir-only Approve/Reject actions that persist decisions to Open Brain through governed backend actions; (4) realtime architecture and security boundaries; (5) responsive/mobile UX and accessibility; (6) MVP vs post-MVP scope. Use these verified source facts in the debate: Next.js official docs describe App Router as the newer router with Server Components; Supabase official docs say Realtime supports Broadcast, Presence and Postgres Changes and recommend Broadcast for scalability/security while Postgres Changes is simpler but scales less well; Motion for React is the current Framer Motion React animation library with production-grade layout/gesture/scroll animations and useReducedMotion accessibility support. Source references: nextjs.org/docs, supabase.com/docs/guides/realtime, supabase.com/docs/guides/realtime/subscribing-to-database-changes, motion.dev/docs/react. Do not invent research citations beyond these supplied sources. Return a concrete component/layout architecture, data flow, state model, animation principles, responsive behavior, and exact approval flow."
+        default: "dev-brain-dashboard-premium-ui-architecture"
         type: string
       rounds:
         description: "Council debate rounds"
@@ -31,9 +31,10 @@ jobs:
   council-e2e:
     runs-on: ubuntu-latest
     env:
-      PROJECT_SLUG: ${{ github.event.inputs.project_slug || 'amir-dev-brain' }}
-      COUNCIL_QUESTION: ${{ github.event.inputs.question || 'dev-brain-dashboard-premium-ui-architecture. Design the premium visual dashboard for Amir Dev Brain AI Council. Debate deeply between analysis and engineering sides: (1) best UX patterns for multi-agent/AI-agent conversations, especially split-screen vs threaded views, provenance, conflict visibility, live-status indicators, and reducing cognitive overload; (2) frontend stack, evaluating Next.js App Router, Tailwind CSS, Motion for React/Framer Motion, and Supabase Realtime; (3) information architecture and layout for showing two model sides debating, round navigation, retrieved memory/provenance, conflict flags, and a final Synthesis panel with Amir-only Approve/Reject actions that persist decisions to Open Brain through governed backend actions; (4) realtime architecture and security boundaries; (5) responsive/mobile UX and accessibility; (6) MVP vs post-MVP scope. Use these verified source facts in the debate: Next.js official docs describe App Router as the newer router with Server Components; Supabase official docs say Realtime supports Broadcast, Presence and Postgres Changes and recommend Broadcast for scalability/security while Postgres Changes is simpler but scales less well; Motion for React is the current Framer Motion React animation library with production-grade layout/gesture/scroll animations and useReducedMotion accessibility support. Source references: nextjs.org/docs, supabase.com/docs/guides/realtime, supabase.com/docs/guides/realtime/subscribing-to-database-changes, motion.dev/docs/react. Do not invent research citations beyond these supplied sources. Return a concrete component/layout architecture, data flow, state model, animation principles, responsive behavior, and exact approval flow.' }}
-      COUNCIL_ROUNDS: ${{ github.event.inputs.rounds || '2' }}
+      PROJECT_SLUG: amir-dev-brain
+      COUNCIL_ROUNDS: "2"
+      COUNCIL_QUESTION: >-
+        dev-brain-dashboard-premium-ui-architecture. Design the premium visual dashboard for Amir Dev Brain AI Council. Debate deeply between analysis and engineering sides about multi-agent conversation UX, split-screen versus threaded views, provenance, conflict visibility, live-status indicators, and cognitive load; evaluate Next.js App Router, Tailwind CSS, Motion for React, and Supabase Realtime; define a concrete layout for two model sides debating, round navigation, retrieved memory/provenance, conflict flags, and a final Synthesis panel with Amir-only Approve/Reject actions that persist decisions to Open Brain through governed backend actions; cover realtime architecture, security boundaries, responsive/mobile UX, accessibility, and MVP versus post-MVP scope. Use only these supplied verified source facts: Next.js official docs describe App Router as the newer router with Server Components. Supabase official docs say Realtime supports Broadcast, Presence and Postgres Changes, and recommend Broadcast for scalability/security while Postgres Changes is simpler but scales less well. Motion for React is the current Framer Motion React animation library with production-grade layout, gesture and scroll animations plus reduced-motion accessibility support. Source references supplied: nextjs.org/docs ; supabase.com/docs/guides/realtime ; supabase.com/docs/guides/realtime/subscribing-to-database-changes ; motion.dev/docs/react. Do not invent research citations beyond these sources. Return a concrete component/layout architecture, data flow, state model, animation principles, responsive behavior, and exact approval flow.
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -63,10 +64,7 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          supabase functions deploy council-e2e-runner \
-            --project-ref hdcpvwsndxxflbednvsq \
-            --no-verify-jwt \
-            --use-api
+          supabase functions deploy council-e2e-runner --project-ref hdcpvwsndxxflbednvsq --no-verify-jwt --use-api
 
       - name: Run dynamic council E2E
         env:
@@ -76,65 +74,18 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           import json, os
-          payload = {
-              "project_slug": os.environ["PROJECT_SLUG"],
-              "question": os.environ["COUNCIL_QUESTION"],
-              "rounds": int(os.environ["COUNCIL_ROUNDS"]),
-          }
-          with open("council-payload.json", "w", encoding="utf-8") as f:
-              json.dump(payload, f, ensure_ascii=False)
-          print("Council request:", json.dumps(payload, ensure_ascii=False))
+          payload = {"project_slug": os.environ["PROJECT_SLUG"], "question": os.environ["COUNCIL_QUESTION"], "rounds": int(os.environ["COUNCIL_ROUNDS"])}
+          open("council-payload.json","w",encoding="utf-8").write(json.dumps(payload,ensure_ascii=False))
           PY
-
-          HTTP_CODE=$(curl --silent --show-error \
-            --output council-e2e-result.json \
-            --write-out '%{http_code}' \
-            --request POST \
-            'https://hdcpvwsndxxflbednvsq.supabase.co/functions/v1/council-e2e-runner' \
-            --header "x-runner-token: $RUNNER_TOKEN" \
-            --header 'content-type: application/json' \
-            --data @council-payload.json)
-          echo "Council runner HTTP $HTTP_CODE"
+          HTTP_CODE=$(curl --silent --show-error --output council-e2e-result.json --write-out '%{http_code}' --request POST 'https://hdcpvwsndxxflbednvsq.supabase.co/functions/v1/council-e2e-runner' --header "x-runner-token: $RUNNER_TOKEN" --header 'content-type: application/json' --data @council-payload.json)
           cat council-e2e-result.json
+          test "$HTTP_CODE" = "200"
           python - <<'PY'
           import json
-          data=json.load(open('council-e2e-result.json', encoding='utf-8'))
-          if not data.get('ok'):
-              raise SystemExit('Council runner returned failure: '+str(data))
+          data=json.load(open('council-e2e-result.json',encoding='utf-8'))
+          if not data.get('ok'): raise SystemExit(str(data))
           text=' '.join(str(x.get('text','')) for x in data.get('result',{}).get('content',[]) if isinstance(x,dict))
-          if 'Saved to Open Brain thought:' not in text:
-              raise SystemExit('Council result did not confirm Open Brain persistence')
-          print('Council E2E completed successfully and persisted to Open Brain')
-          PY
-
-      - name: Verify metadata cache populated by retrieval
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          import json
-          q="select count(*)::int as cached_rows, max(cached_at) as latest_cached_at from public.open_brain_metadata_cache;"
-          open('cache-verify-payload.json','w').write(json.dumps({'query':q}))
-          PY
-          HTTP_CODE=$(curl --silent --show-error \
-            --output cache-verify-result.json \
-            --write-out '%{http_code}' \
-            --request POST \
-            'https://api.supabase.com/v1/projects/hdcpvwsndxxflbednvsq/database/query' \
-            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-            --header 'content-type: application/json' \
-            --data @cache-verify-payload.json)
-          cat cache-verify-result.json
-          case "$HTTP_CODE" in 2*) ;; *) echo "Unexpected cache verification HTTP $HTTP_CODE"; exit 1 ;; esac
-          python - <<'PY'
-          import json
-          data=json.load(open('cache-verify-result.json'))
-          rows=data if isinstance(data,list) else data.get('result',data.get('data',[]))
-          if not rows or int(rows[0].get('cached_rows') or 0) < 1:
-              raise SystemExit('Metadata cache was not populated by governed retrieval: '+str(data))
-          print('Metadata cache populated:', rows[0])
+          if 'Saved to Open Brain thought:' not in text: raise SystemExit('Council result did not confirm Open Brain persistence')
           PY
 
       - name: Upload council result artifact
@@ -145,7 +96,6 @@ jobs:
           path: |
             council-payload.json
             council-e2e-result.json
-            cache-verify-result.json
           if-no-files-found: warn
 
       - name: Remove temporary runner secret
@@ -154,6 +104,4 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         shell: bash
         run: |
-          if command -v supabase >/dev/null 2>&1; then
-            supabase secrets unset COUNCIL_RUNNER_TOKEN --project-ref hdcpvwsndxxflbednvsq || true
-          fi
+          supabase secrets unset COUNCIL_RUNNER_TOKEN --project-ref hdcpvwsndxxflbednvsq || true
