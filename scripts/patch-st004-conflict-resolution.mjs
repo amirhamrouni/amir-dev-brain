@@ -5,10 +5,17 @@ let src = fs.readFileSync(target, 'utf8');
 const marker = '  return server;\n}\n\n// --- Hono App with Auth + CORS ---';
 if (!src.includes(marker)) throw new Error('ST-004 patch marker not found');
 
-src = src.replace(
-  ".select('id, content, metadata, created_at, updated_at, superseded_by')",
-  ".select('id, content, metadata, created_at, updated_at, superseded_by, conflict_source, resolution_status, blocked_action')",
-);
+// ST-003 may add namespace columns. Append the ST-004 governance columns to the
+// st003LoadThought select without assuming the exact ST-003 column list.
+const loadSelectPattern = /(async function st003LoadThought[\s\S]*?\.from\('thoughts'\)\n\s*\.select\(')([^']+)('\))/;
+const loadSelectMatch = src.match(loadSelectPattern);
+if (!loadSelectMatch) throw new Error('ST-004 st003LoadThought select hook not found');
+const requiredColumns = ['conflict_source', 'resolution_status', 'blocked_action'];
+const currentColumns = loadSelectMatch[2].split(',').map((v) => v.trim()).filter(Boolean);
+for (const column of requiredColumns) {
+  if (!currentColumns.includes(column)) currentColumns.push(column);
+}
+src = src.replace(loadSelectPattern, `$1${currentColumns.join(', ')}$3`);
 
 const injected = String.raw`
   // --- ST-004: deterministic Dev Brain conflict resolution ---
@@ -129,4 +136,4 @@ src = src.replace(
 );
 
 fs.writeFileSync(target, src);
-console.log('Patched Open Brain MCP with ST-004 deterministic conflict resolution');
+console.log('Patched Open Brain MCP with ST-004 deterministic conflict resolution and namespaced thought fields');
