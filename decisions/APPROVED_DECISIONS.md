@@ -107,5 +107,22 @@ Only decisions explicitly approved by Amir belong here. Model suggestions are no
   - Defer full Content Genome vocabulary/rhythm/CTA profiling, automated constraint relaxation, multi-variant competition, and complex ML analytics until post-V1 evidence justifies them.
 - Evidence basis: autonomous free-tier Amir AI Council debate `ai-content-brain-architecture-and-approval-ui`, Open Brain thought `119c15e4-c45f-4a4c-80f4-e1515131ba20`, followed by Amir's explicit approval on 2026-09-07.
 
+### Amir Dev Brain
+
+#### ST-003 — Open Brain Memory Retrieval
+- Status: approved
+- Scope: Amir Dev Brain / Open Brain memory retrieval and long-debate context optimization
+- Authority: Amir
+- Decision date: 2026-09-07
+- Decision:
+  - Adopt the Council's layered retrieval architecture: deterministic metadata filtering -> hybrid lexical/semantic retrieval -> authority-aware conflict handling and ranking -> deduplicated token-budget packing.
+  - Default retrieval scope is the active project. Cross-project retrieval requires explicit opt-in.
+  - Preserve memory history; stale/superseded memories are never deleted merely because they are superseded. Add `superseded_by` to the canonical `thoughts` records so the replacement chain remains auditable.
+  - Long-running Council debates use a **Session Digest**. Later rounds receive the compact debate digest plus newly retrieved evidence rather than the entire accumulated transcript.
+  - Conflicts use **Flag & Include** by default: conflicting memories remain available with explicit conflict/provenance annotation so Amir can intervene. Do not silently discard them solely because they conflict.
+  - Cache is limited initially to **metadata-level caching only**. Do not cache full thought bodies or semantic result payloads until evidence justifies expanding the cache.
+  - Retrieval results should retain provenance and authority metadata. GitHub remains the source of truth for live implementation state under AD-002; Open Brain remains the canonical persistent episodic memory layer under AD-007.
+- Evidence basis: autonomous free-tier Amir AI Council debate `open-brain-memory-retrieval-and-context-optimization`, Open Brain thought `fc8d2281-db97-4a7b-a287-6d93275f6e8b`, followed by Amir's explicit approval on 2026-09-07.
+
 ## Maintenance
 When Amir explicitly approves a new decision, append it here with a stable ID. If a decision is later changed, mark the older entry `superseded` and link the replacement rather than deleting history.
