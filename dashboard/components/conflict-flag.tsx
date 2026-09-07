@@ -13,7 +13,7 @@ export function ConflictFlagBadge({ detail, compact = false }: { detail?: string
       title={detail}
     >
       <TriangleAlert size={14} strokeWidth={2.2} aria-hidden="true" />
-      <span>[CONFLICT_FLAG]</span>
+      <span>[تعارض]</span>
       {detail && !compact ? <span className="conflict-detail">{detail}</span> : null}
     </motion.div>
   );
