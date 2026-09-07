@@ -88,5 +88,24 @@ Only decisions explicitly approved by Amir belong here. Model suggestions are no
   - Do **not** build a custom Redis/BullMQ workflow platform merely to reproduce capabilities already provided by the chosen driver.
 - Evidence basis: first autonomous Amir AI Council E2E for `v1-architecture-and-pipeline`, Open Brain thought `702e9ed1-02bf-4b43-ad3d-4ad8525dd021`, followed by Amir's explicit approval of the capability-based Inngest formulation.
 
+#### ST-002 — Content Brain Architecture & Approval Queue V1
+- Status: approved
+- Scope: Smart Twin Hamrouni V1 Content Brain and Approval Queue
+- Authority: Amir
+- Decision date: 2026-09-07
+- Decision:
+  - ST-001 remains authoritative. This decision operationalizes the Content Brain and Approval Queue without changing the three-phase Strategy -> Creation -> Operations architecture.
+  - Implement the V1 Product Content Brain as a **PostgreSQL-backed structured event store**, not as a monolithic AI agent or ML platform.
+  - Record at minimum: `DraftCreated`, `DraftEdited`, `DraftApproved`, `DraftRejected`, `PublishResult`, `PerformanceSnapshot`, and explicit `LearningSignal` events.
+  - Learning signals may propose generation-parameter changes but may not silently modify locked brand constraints such as banned phrases, tone, taboos, or visual identity. Constraint changes require Amir's explicit approval.
+  - Specialized agent roles remain conceptual/code boundaries inside the three workflow phases rather than separate V1 microservices.
+  - The Approval Queue is a critical V1 operator surface. Each `ContentDraft` is reviewed individually before publishing.
+  - Each approval card should expose editable generated copy, Facebook and Instagram variants, image preview/generation metadata when available, trend provenance, quality results, and the underlying `ContentBrief` rationale when available.
+  - Approval actions are `Edit`, `Approve`, `Reject`, and later `Schedule`; every state-changing action must produce an immutable audit/event-store record.
+  - Show the content lifecycle visibly: `PENDING_APPROVAL -> APPROVED -> SCHEDULED/PUBLISHING -> PUBLISHED | FAILED`, with current implementation allowed to omit `SCHEDULED` until scheduling UI is introduced.
+  - A filtered/table overview is allowed. Bulk scheduling of already-approved drafts is allowed. **Batch approve is forbidden in V1**.
+  - Defer full Content Genome vocabulary/rhythm/CTA profiling, automated constraint relaxation, multi-variant competition, and complex ML analytics until post-V1 evidence justifies them.
+- Evidence basis: autonomous free-tier Amir AI Council debate `ai-content-brain-architecture-and-approval-ui`, Open Brain thought `119c15e4-c45f-4a4c-80f4-e1515131ba20`, followed by Amir's explicit approval on 2026-09-07.
+
 ## Maintenance
 When Amir explicitly approves a new decision, append it here with a stable ID. If a decision is later changed, mark the older entry `superseded` and link the replacement rather than deleting history.
