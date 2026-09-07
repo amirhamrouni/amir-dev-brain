@@ -101,10 +101,10 @@ const injected = String.raw`
         ]);
         const topic = question || "Compare the current architecture and MVP direction, challenge weak assumptions, and converge on the strongest recommendation for Amir.";
         const baseContext = [
-          "PROJECT MEMORY:\n" + compactCouncilContext(project, 5500),
-          "APPROVED DECISIONS:\n" + compactCouncilContext(approved, 3000),
-          "STORED GPT OPINION:\n" + compactCouncilContext(gptOpinion, 1000),
-          "STORED GEMINI OPINION:\n" + compactCouncilContext(geminiOpinion, 1000),
+          "PROJECT MEMORY:\n" + compactCouncilContext(project, 1800),
+          "APPROVED DECISIONS:\n" + compactCouncilContext(approved, 900),
+          "STORED GPT OPINION:\n" + compactCouncilContext(gptOpinion, 300),
+          "STORED GEMINI OPINION:\n" + compactCouncilContext(geminiOpinion, 300),
           "DEBATE QUESTION:\n" + topic,
           "Rule: this is model opinion only. Never claim an Approved Decision. Amir alone approves final decisions. Keep each response concise and decision-focused."
         ].join("\n\n---\n\n");
