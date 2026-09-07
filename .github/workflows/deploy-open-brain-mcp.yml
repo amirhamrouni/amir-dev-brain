@@ -97,6 +97,15 @@ jobs:
           grep -q 'amir_retrieve_memory_context' supabase/functions/open-brain-mcp/index.ts
           grep -q 'amir_governance_preflight' supabase/functions/open-brain-mcp/index.ts
           grep -q 'retrieveSt003Context(topic, safe, 8)' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'match_thoughts_namespaced' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'p_target_language' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'target_language: z.string' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'cross_language: z.boolean' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'generationAdapterOpenRouter' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'generationAdapterGoogle' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'OPENROUTER_API_KEYS' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'GOOGLE_AI_STUDIO_API_KEYS' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'x-goog-api-key' supabase/functions/open-brain-mcp/index.ts
           grep -q 'st004FailFastDecision' supabase/functions/open-brain-mcp/index.ts
           grep -q 'pending_action' supabase/functions/open-brain-mcp/index.ts
           grep -q 'superseded_by' supabase/functions/open-brain-mcp/index.ts
