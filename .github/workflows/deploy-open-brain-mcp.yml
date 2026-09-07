@@ -13,6 +13,9 @@ on:
       - "scripts/patch-st003-retrieval.mjs"
       - "scripts/st003-retrieval-core.mjs"
       - "tests/st003-retrieval-core.test.mjs"
+      - "scripts/patch-st004-conflict-resolution.mjs"
+      - "scripts/st004-conflict-resolution-core.mjs"
+      - "tests/st004-conflict-resolution-core.test.mjs"
       - "supabase/**"
 
 permissions:
@@ -25,8 +28,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Run ST-003 retrieval unit tests
-        run: node --test tests/st003-retrieval-core.test.mjs
+      - name: Run ST-003 and ST-004 unit tests
+        run: node --test tests/st003-retrieval-core.test.mjs tests/st004-conflict-resolution-core.test.mjs
 
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
@@ -64,6 +67,9 @@ jobs:
       - name: Apply ST-003 governed memory retrieval
         run: node scripts/patch-st003-retrieval.mjs supabase/functions/open-brain-mcp/index.ts
 
+      - name: Apply ST-004 deterministic conflict resolution
+        run: node scripts/patch-st004-conflict-resolution.mjs supabase/functions/open-brain-mcp/index.ts
+
       - name: Normalize generated TypeScript
         shell: bash
         run: |
@@ -85,8 +91,13 @@ jobs:
           grep -q 'github_fetch_file' supabase/functions/open-brain-mcp/index.ts
           grep -q 'amir_council_debate' supabase/functions/open-brain-mcp/index.ts
           grep -q 'amir_retrieve_memory_context' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'amir_governance_preflight' supabase/functions/open-brain-mcp/index.ts
           grep -q 'retrieveSt003Context(topic, safe, 8)' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'st004FailFastDecision' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'pending_action' supabase/functions/open-brain-mcp/index.ts
           grep -q 'superseded_by' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'resolution_status' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'blocked_action' supabase/functions/open-brain-mcp/index.ts
           grep -q '\[CONFLICT_FLAG topics=' supabase/functions/open-brain-mcp/index.ts
           grep -q 'google/gemini-2.0-flash-exp:free' supabase/functions/open-brain-mcp/index.ts
           grep -q 'qwen/qwen-2.5-coder-32b-instruct:free' supabase/functions/open-brain-mcp/index.ts
