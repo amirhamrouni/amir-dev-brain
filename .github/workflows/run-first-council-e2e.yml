@@ -77,7 +77,16 @@ jobs:
           payload = {"project_slug": os.environ["PROJECT_SLUG"], "question": os.environ["COUNCIL_QUESTION"], "rounds": int(os.environ["COUNCIL_ROUNDS"])}
           open("council-payload.json","w",encoding="utf-8").write(json.dumps(payload,ensure_ascii=False))
           PY
-          HTTP_CODE=$(curl --silent --show-error --output council-e2e-result.json --write-out '%{http_code}' --request POST 'https://hdcpvwsndxxflbednvsq.supabase.co/functions/v1/council-e2e-runner' --header "x-runner-token: $RUNNER_TOKEN" --header 'content-type: application/json' --data @council-payload.json)
+
+          HTTP_CODE="000"
+          for attempt in 1 2 3 4 5 6; do
+            HTTP_CODE=$(curl --silent --show-error --output council-e2e-result.json --write-out '%{http_code}' --request POST 'https://hdcpvwsndxxflbednvsq.supabase.co/functions/v1/council-e2e-runner' --header "x-runner-token: $RUNNER_TOKEN" --header 'content-type: application/json' --data @council-payload.json)
+            if [ "$HTTP_CODE" = "200" ]; then break; fi
+            if [ "$HTTP_CODE" != "401" ]; then break; fi
+            echo "Runner secret not propagated yet (attempt $attempt); retrying..."
+            sleep 4
+          done
+
           cat council-e2e-result.json
           test "$HTTP_CODE" = "200"
           python - <<'PY'
