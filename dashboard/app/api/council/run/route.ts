@@ -147,6 +147,7 @@ export async function POST(request: NextRequest) {
       "content-type": "text/plain; charset=utf-8",
       "cache-control": "no-store, no-cache, must-revalidate, proxy-revalidate",
       "x-accel-buffering": "no",
+      "x-council-model": MODEL,
     },
   });
 }
