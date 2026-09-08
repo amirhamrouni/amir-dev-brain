@@ -43,23 +43,28 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(req) });
   if (req.method !== "POST") return json(req, { error: "method_not_allowed" }, 405);
 
-  const brainKey = (Deno.env.get("MCP_ACCESS_KEY") || "").trim();
+  const configuredBrainKey = (Deno.env.get("MCP_ACCESS_KEY") || "").trim();
   const expectedRunner = (Deno.env.get("COUNCIL_RUNNER_TOKEN") || "").trim();
   const suppliedRunner = (req.headers.get("x-runner-token") || "").trim();
   const suppliedBrain = readDashboardKey(req);
   const runnerAuthorized = Boolean(expectedRunner) && suppliedRunner === expectedRunner;
-  const dashboardAuthorized = Boolean(brainKey) && suppliedBrain === brainKey;
 
-  if (!brainKey) {
-    return json(req, { error: "mcp_access_key_missing", message: "MCP_ACCESS_KEY غير مهيأ على الخادم." }, 500);
-  }
-  if (!runnerAuthorized && !dashboardAuthorized) {
+  // Dashboard requests are authenticated by the canonical Open Brain MCP itself.
+  // This avoids maintaining two independent comparisons of MCP_ACCESS_KEY.
+  const effectiveBrainKey = runnerAuthorized ? configuredBrainKey : suppliedBrain;
+
+  if (!effectiveBrainKey) {
     return json(req, {
-      error: "unauthorized",
-      message: suppliedBrain
-        ? "مفتاح الوصول لا يطابق MCP_ACCESS_KEY الحالي على الخادم."
-        : "لم يصل مفتاح الوصول إلى الخادم.",
+      error: "missing_access_key",
+      message: "لم يصل مفتاح الوصول إلى الخادم.",
     }, 401);
+  }
+
+  if (runnerAuthorized && !configuredBrainKey) {
+    return json(req, {
+      error: "mcp_access_key_missing",
+      message: "MCP_ACCESS_KEY غير مهيأ على الخادم.",
+    }, 500);
   }
 
   try {
@@ -77,10 +82,10 @@ Deno.serve(async (req) => {
     }
 
     const transport = new StreamableHTTPClientTransport(new URL(MCP_URL), {
-      requestInit: { headers: { "x-brain-key": brainKey } },
+      requestInit: { headers: { "x-brain-key": effectiveBrainKey } },
     });
 
-    const client = new Client({ name: "amir-council-dashboard-runner", version: "1.3.0" });
+    const client = new Client({ name: "amir-council-dashboard-runner", version: "1.4.0" });
     await client.connect(transport);
     const result = await client.callTool({ name: requestedTool, arguments: requestedArguments }, undefined, {
       timeout: 240_000,
@@ -91,6 +96,14 @@ Deno.serve(async (req) => {
     if ((result as any)?.isError) return json(req, { ok: false, result }, 502);
     return json(req, { ok: true, tool: requestedTool, result });
   } catch (error) {
-    return json(req, { ok: false, error: String(error?.message || error) }, 500);
+    const message = String(error?.message || error);
+    const unauthorized = /401|unauthorized|forbidden|invalid.*key|access.*key/i.test(message);
+    return json(req, {
+      ok: false,
+      error: unauthorized ? "unauthorized" : "mcp_call_failed",
+      message: unauthorized
+        ? "المفتاح لم يقبله Open Brain MCP. تأكد أن القيمة هي MCP_ACCESS_KEY الحالية ثم أعد المحاولة."
+        : message,
+    }, unauthorized ? 401 : 500);
   }
 });
