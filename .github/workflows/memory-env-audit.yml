@@ -18,6 +18,10 @@ jobs:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: team_UKAtfO6HzAtWy9WQ5YuXlPLC
       VERCEL_PROJECT_ID: prj_jFc0iqPP0ofyCATBibwmGQbpLMjZ
+      GH_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      GH_QDRANT_URL: ${{ secrets.QDRANT_URL }}
+      GH_QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+      GH_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     steps:
       - name: Inspect required variable metadata only
         shell: bash
@@ -29,7 +33,7 @@ jobs:
             --header "authorization: Bearer ${VERCEL_TOKEN}" \
             --output /tmp/vercel-envs.json
           python - <<'PY'
-          import json
+          import json, os
           data=json.load(open('/tmp/vercel-envs.json',encoding='utf-8'))
           envs=data.get('envs', [])
           required=['DATABASE_URL','QDRANT_URL','QDRANT_API_KEY','OPENAI_API_KEY']
@@ -44,12 +48,20 @@ jobs:
                   'type': item.get('type'),
                   'gitBranch': item.get('gitBranch'),
               })
+          print('--- Vercel project metadata ---')
           for key in required:
               rows=found.get(key,[])
               prod=any('production' in (row.get('target') or []) and not row.get('gitBranch') for row in rows)
               print(f'{key}: present={bool(rows)} production={prod} metadata={rows}')
           missing=[key for key in required if not found.get(key)]
-          not_prod=[key for key in required if found.get(key) and not any('production' in (r.get('target') or []) and not r.get('gitBranch') for r in found[key])]
           print('missing_keys=' + ','.join(missing))
-          print('not_production_scoped=' + ','.join(not_prod))
+          print('--- GitHub Actions secret presence only ---')
+          mapping={
+              'DATABASE_URL':'GH_DATABASE_URL',
+              'QDRANT_URL':'GH_QDRANT_URL',
+              'QDRANT_API_KEY':'GH_QDRANT_API_KEY',
+              'OPENAI_API_KEY':'GH_OPENAI_API_KEY',
+          }
+          for key, env_name in mapping.items():
+              print(f'{key}: github_secret_present={bool(os.environ.get(env_name))}')
           PY
