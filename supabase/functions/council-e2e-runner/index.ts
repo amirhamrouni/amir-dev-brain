@@ -14,7 +14,7 @@ function corsHeaders(req: Request) {
   return {
     "access-control-allow-origin": DASHBOARD_ORIGINS.has(origin) ? origin : "https://amir-brain-console.vercel.app",
     "access-control-allow-methods": "POST, OPTIONS",
-    "access-control-allow-headers": "content-type, x-runner-token, x-amir-key",
+    "access-control-allow-headers": "authorization, content-type, x-runner-token, x-amir-key, x-brain-key",
     "vary": "Origin",
   };
 }
@@ -26,19 +26,41 @@ function json(req: Request, body: unknown, status = 200) {
   });
 }
 
+function readDashboardKey(req: Request) {
+  const authorization = (req.headers.get("authorization") || "").trim();
+  const bearer = authorization.toLowerCase().startsWith("bearer ")
+    ? authorization.slice(7).trim()
+    : "";
+  return (
+    req.headers.get("x-brain-key") ||
+    req.headers.get("x-amir-key") ||
+    bearer ||
+    ""
+  ).trim();
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(req) });
   if (req.method !== "POST") return json(req, { error: "method_not_allowed" }, 405);
 
-  const brainKey = Deno.env.get("MCP_ACCESS_KEY") || "";
-  const expectedRunner = Deno.env.get("COUNCIL_RUNNER_TOKEN") || "";
-  const suppliedRunner = req.headers.get("x-runner-token") || "";
-  const suppliedBrain = req.headers.get("x-amir-key") || "";
+  const brainKey = (Deno.env.get("MCP_ACCESS_KEY") || "").trim();
+  const expectedRunner = (Deno.env.get("COUNCIL_RUNNER_TOKEN") || "").trim();
+  const suppliedRunner = (req.headers.get("x-runner-token") || "").trim();
+  const suppliedBrain = readDashboardKey(req);
   const runnerAuthorized = Boolean(expectedRunner) && suppliedRunner === expectedRunner;
   const dashboardAuthorized = Boolean(brainKey) && suppliedBrain === brainKey;
 
-  if (!runnerAuthorized && !dashboardAuthorized) return json(req, { error: "unauthorized" }, 401);
-  if (!brainKey) return json(req, { error: "MCP_ACCESS_KEY missing" }, 500);
+  if (!brainKey) {
+    return json(req, { error: "mcp_access_key_missing", message: "MCP_ACCESS_KEY غير مهيأ على الخادم." }, 500);
+  }
+  if (!runnerAuthorized && !dashboardAuthorized) {
+    return json(req, {
+      error: "unauthorized",
+      message: suppliedBrain
+        ? "مفتاح الوصول لا يطابق MCP_ACCESS_KEY الحالي على الخادم."
+        : "لم يصل مفتاح الوصول إلى الخادم.",
+    }, 401);
+  }
 
   try {
     const body = await req.json().catch(() => ({}));
@@ -58,7 +80,7 @@ Deno.serve(async (req) => {
       requestInit: { headers: { "x-brain-key": brainKey } },
     });
 
-    const client = new Client({ name: "amir-council-dashboard-runner", version: "1.2.0" });
+    const client = new Client({ name: "amir-council-dashboard-runner", version: "1.3.0" });
     await client.connect(transport);
     const result = await client.callTool({ name: requestedTool, arguments: requestedArguments }, undefined, {
       timeout: 240_000,
