@@ -47,6 +47,52 @@ function readDashboardKey(req: Request) {
   );
 }
 
+async function runCouncilInBackground({
+  projectSlug,
+  question,
+  rounds,
+  requestedTool,
+  content,
+  runId,
+  effectiveBrainKey,
+}: {
+  projectSlug: string;
+  question: string;
+  rounds: number;
+  requestedTool: "capture_thought" | "amir_council_debate";
+  content: string;
+  runId: string;
+  effectiveBrainKey: string;
+}) {
+  const requestedArguments = requestedTool === "capture_thought"
+    ? { content }
+    : { project_slug: projectSlug, question, rounds, run_id: runId };
+
+  const transport = new StreamableHTTPClientTransport(new URL(MCP_URL), {
+    requestInit: { headers: { "x-brain-key": effectiveBrainKey } },
+  });
+
+  const client = new Client({ name: "amir-council-dashboard-runner", version: "1.6.0" });
+  try {
+    await client.connect(transport);
+    const result = await client.callTool({ name: requestedTool, arguments: requestedArguments }, undefined, {
+      timeout: 240_000,
+      maxTotalTimeout: 240_000,
+    });
+    if ((result as any)?.isError) {
+      console.error("council_background_tool_error", { runId, requestedTool, result });
+    }
+  } catch (error) {
+    console.error("council_background_failed", {
+      runId,
+      requestedTool,
+      message: String((error as Error)?.message || error),
+    });
+  } finally {
+    await client.close().catch(() => undefined);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(req) });
   if (req.method !== "POST") return json(req, { error: "method_not_allowed" }, 405);
@@ -83,47 +129,53 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Once the caller is authenticated, always use the canonical server-side key
-  // for the internal MCP hop. This removes browser/header formatting differences.
-  const effectiveBrainKey = configuredBrainKey;
+  const body = await req.json().catch(() => ({}));
+  const projectSlug = String(body.project_slug || "amir-dev-brain");
+  const question = String(body.question || "v1-architecture-and-pipeline");
+  const rounds = Number.isInteger(body.rounds) ? Math.min(3, Math.max(1, body.rounds)) : 1;
+  const requestedTool: "capture_thought" | "amir_council_debate" = body.tool_name === "capture_thought" ? "capture_thought" : "amir_council_debate";
+  const content = String(body.content || "");
+  const runId = String(body.run_id || crypto.randomUUID()).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 96) || crypto.randomUUID();
 
-  try {
-    const body = await req.json().catch(() => ({}));
-    const projectSlug = body.project_slug || "amir-dev-brain";
-    const question = body.question || "v1-architecture-and-pipeline";
-    const rounds = Number.isInteger(body.rounds) ? Math.min(3, Math.max(1, body.rounds)) : 1;
-    const requestedTool = body.tool_name === "capture_thought" ? "capture_thought" : "amir_council_debate";
-    const requestedArguments = requestedTool === "capture_thought"
-      ? { content: String(body.content || "") }
-      : { project_slug: projectSlug, question, rounds };
+  if (requestedTool === "capture_thought" && !content.trim()) {
+    return json(req, { ok: false, error: "capture_thought content is required" }, 400);
+  }
 
-    if (requestedTool === "capture_thought" && !requestedArguments.content.trim()) {
-      return json(req, { ok: false, error: "capture_thought content is required" }, 400);
-    }
-
-    const transport = new StreamableHTTPClientTransport(new URL(MCP_URL), {
-      requestInit: { headers: { "x-brain-key": effectiveBrainKey } },
-    });
-
-    const client = new Client({ name: "amir-council-dashboard-runner", version: "1.5.0" });
-    await client.connect(transport);
-    const result = await client.callTool({ name: requestedTool, arguments: requestedArguments }, undefined, {
-      timeout: 240_000,
-      maxTotalTimeout: 240_000,
-    });
-    await client.close();
-
-    if ((result as any)?.isError) return json(req, { ok: false, result }, 502);
-    return json(req, { ok: true, tool: requestedTool, result });
-  } catch (error) {
-    const message = String(error?.message || error);
-    const unauthorized = /401|unauthorized|forbidden|invalid.*key|access.*key/i.test(message);
+  const realtimeAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+  if (!realtimeAnonKey && requestedTool === "amir_council_debate") {
     return json(req, {
       ok: false,
-      error: unauthorized ? "mcp_internal_auth_failed" : "mcp_call_failed",
-      message: unauthorized
-        ? "تم قبول مفتاح الواجهة، لكن Open Brain MCP رفض المفتاح الداخلي. أعدنا توحيد المسار على المفتاح المخزن في Supabase؛ إذا استمرت الرسالة فالمشكلة في نسخة MCP المنشورة لا في إدخالك."
-        : message,
-    }, unauthorized ? 502 : 500);
+      error: "realtime_anon_key_missing",
+      message: "SUPABASE_ANON_KEY غير متاح للـ Realtime handoff.",
+    }, 500);
   }
+
+  const background = runCouncilInBackground({
+    projectSlug,
+    question,
+    rounds,
+    requestedTool,
+    content,
+    runId,
+    effectiveBrainKey: configuredBrainKey,
+  });
+
+  // Supabase Edge Runtime keeps waitUntil work alive after the HTTP response is returned.
+  // This is the fire-and-forget boundary that prevents the browser request from waiting
+  // for the full multi-model council debate.
+  // deno-lint-ignore no-explicit-any
+  const edgeRuntime = (globalThis as any).EdgeRuntime;
+  if (edgeRuntime?.waitUntil) edgeRuntime.waitUntil(background);
+  else background.catch((error) => console.error("council_background_unhandled", error));
+
+  return json(req, {
+    ok: true,
+    accepted: true,
+    run_id: runId,
+    channel: `council:${runId}`,
+    realtime: requestedTool === "amir_council_debate" ? {
+      url: `https://${PROJECT_REF}.supabase.co`,
+      anon_key: realtimeAnonKey,
+    } : null,
+  }, 200);
 });
