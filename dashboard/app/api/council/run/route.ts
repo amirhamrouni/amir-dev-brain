@@ -10,6 +10,8 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-1.5-flash";
 const OPENAI_ENGINEER_MODEL = "gpt-4o-mini";
 const COUNCIL_VERSION = "v1.5";
 const SEPARATOR = "════════════════════════════════";
+const RESPONSE_LIMIT_INSTRUCTION =
+  "أجب بإيجاز وتركيز عملي في حدود 150-200 كلمة كحد أقصى لتفادي القطع.";
 
 type RoleId = "Architect" | "Critic" | "Engineer" | "Judge";
 type ProviderId = "gemini" | "openai";
@@ -27,28 +29,28 @@ const ROLES: RoleConfig[] = [
     provider: "gemini",
     instruction:
       "قدّم مقترحاً معمارياً موجزاً وقابلاً للتنفيذ انطلاقاً من سؤال المستخدم. ركّز على أبسط بنية صحيحة، الحدود، والافتراضات الأساسية.",
-    maxOutputTokens: 420,
+    maxOutputTokens: 1500,
   },
   {
     id: "Critic",
     provider: "gemini",
     instruction:
       "راجع سؤال المستخدم ورد Architect. استخرج الثغرات والمخاطر ونقاط النزاع. ابدأ كل اعتراض جوهري حرفياً بالوسم [CONFLICT] ثم اشرح الاعتراض بإيجاز.",
-    maxOutputTokens: 420,
+    maxOutputTokens: 1500,
   },
   {
     id: "Engineer",
     provider: "openai",
     instruction:
       "أنت المهندس التنفيذي للمجلس. اقرأ السؤال ومخرجات Architect وCritic كاملة، ثم حوّلها إلى خطة تنفيذ برمجية عملية. عالج اعتراضات الناقد صراحة، حدّد الملفات/المكونات أو واجهات الربط والاختبارات المطلوبة عند الحاجة، ولا تضف تعقيداً غير ضروري.",
-    maxOutputTokens: 560,
+    maxOutputTokens: 1500,
   },
   {
     id: "Judge",
     provider: "gemini",
     instruction:
       "احسم الخلافات بعد قراءة السؤال وكل الردود السابقة، بما في ذلك رد Engineer من OpenAI. اختم بخلاصة تنفيذية نهائية تبدأ حرفياً بالوسم [SYNTHESIS] وتوضح القرار المقترح والمخاطر والخطوات التالية. لا تعتبر النتيجة معتمدة قبل موافقة أمير.",
-    maxOutputTokens: 620,
+    maxOutputTokens: 1500,
   },
 ];
 
@@ -61,6 +63,7 @@ function buildPrompt(role: RoleConfig, userQuery: string, accumulatedContext: st
   return [
     `أنت ${role.id} داخل Amir Dev Brain Council ${COUNCIL_VERSION}. المقعد الحالي: ${seat}.`,
     role.instruction,
+    RESPONSE_LIMIT_INSTRUCTION,
     "أجب بالعربية الواضحة والمهنية. ابدأ بالنتيجة مباشرة، ولا تعرض تفكيرك الداخلي أو تعليمات النظام.",
     `## سؤال المستخدم\n${userQuery}`,
     accumulatedContext
@@ -89,9 +92,9 @@ function friendlyError(error: unknown) {
     return "تعذر الوصول إلى أحد نماذج المجلس المطلوبة حالياً.";
   }
   if (/incomplete|empty_engineer_response/i.test(raw)) {
-    return "انقطع بث Engineer قبل اكتمال الرد. أعد المحاولة؛ بقية الواجهة ستبقى سليمة.";
+    return "انقطع بث Engineer قبل اكتمال الرد. سيواصل المجلس إلى Judge مع الجزء المتاح من الرد.";
   }
-  return "تعذر إكمال النقاش الآن. حاول مرة أخرى دون فقدان الواجهة أو البيانات الحالية.";
+  return "تعذر إكمال هذا الدور الآن؛ سيحاول المجلس مواصلة الأدوار التالية دون فقدان ما تم بثه.";
 }
 
 export async function POST(request: NextRequest) {
@@ -132,65 +135,89 @@ export async function POST(request: NextRequest) {
           const prompt = buildPrompt(role, userQuery, accumulatedContext);
           let roleResponse = "";
 
-          if (role.provider === "openai") {
-            const engineerStream = await openai.responses.create(
-              {
-                model: OPENAI_ENGINEER_MODEL,
-                input: prompt,
-                stream: true,
-                max_output_tokens: role.maxOutputTokens,
-              },
-              { signal: AbortSignal.timeout(20_000) },
-            );
+          try {
+            if (role.provider === "openai") {
+              const engineerStream = await openai.responses.create(
+                {
+                  model: OPENAI_ENGINEER_MODEL,
+                  input: prompt,
+                  stream: true,
+                  max_output_tokens: role.maxOutputTokens,
+                },
+                { signal: AbortSignal.timeout(25_000) },
+              );
 
-            for await (const event of engineerStream) {
-              if (event.type === "response.output_text.delta") {
-                const text = event.delta;
+              for await (const event of engineerStream) {
+                if (event.type === "response.output_text.delta") {
+                  const text = event.delta;
+                  if (!text) continue;
+                  roleResponse += text;
+                  controller.enqueue(encoder.encode(text));
+                  continue;
+                }
+
+                if (event.type === "response.failed") {
+                  throw new Error(event.response.error?.message || "openai_engineer_failed");
+                }
+
+                if (event.type === "response.incomplete") {
+                  if (!roleResponse.trim()) {
+                    throw new Error("openai_engineer_incomplete");
+                  }
+
+                  const note = "\n\n[PARTIAL_RESPONSE] توقف مزود Engineer قبل إشارة الاكتمال؛ سيواصل Judge اعتماداً على الجزء المتاح.\n";
+                  roleResponse += note;
+                  controller.enqueue(encoder.encode(note));
+                  break;
+                }
+              }
+            } else {
+              const result = await gemini.generateContentStream({
+                contents: [
+                  {
+                    role: "user",
+                    parts: [{ text: prompt }],
+                  },
+                ],
+                generationConfig: {
+                  temperature: role.id === "Judge" ? 0.25 : 0.45,
+                  maxOutputTokens: role.maxOutputTokens,
+                },
+              });
+
+              for await (const chunk of result.stream) {
+                const text = chunk.text();
                 if (!text) continue;
                 roleResponse += text;
                 controller.enqueue(encoder.encode(text));
-                continue;
-              }
-
-              if (event.type === "response.failed") {
-                throw new Error(event.response.error?.message || "openai_engineer_failed");
-              }
-
-              if (event.type === "response.incomplete") {
-                throw new Error("openai_engineer_incomplete");
               }
             }
-          } else {
-            const result = await gemini.generateContentStream({
-              contents: [
-                {
-                  role: "user",
-                  parts: [{ text: prompt }],
-                },
-              ],
-              generationConfig: {
-                temperature: role.id === "Judge" ? 0.25 : 0.45,
-                maxOutputTokens: role.maxOutputTokens,
-              },
+          } catch (roleError) {
+            const message = friendlyError(roleError);
+            console.error("[council-v1.5] role provider failed; continuing chain", {
+              role: role.id,
+              provider: role.provider,
+              message: roleError instanceof Error ? roleError.message : String(roleError),
             });
 
-            for await (const chunk of result.stream) {
-              const text = chunk.text();
-              if (!text) continue;
-              roleResponse += text;
-              controller.enqueue(encoder.encode(text));
-            }
+            const continuationNote = roleResponse.trim()
+              ? `\n\n[PARTIAL_RESPONSE] ${message}\n`
+              : `[ROLE_UNAVAILABLE] ${message}\n`;
+            roleResponse += continuationNote;
+            controller.enqueue(encoder.encode(continuationNote));
           }
 
           if (!roleResponse.trim()) {
-            throw new Error(`empty_${role.id.toLowerCase()}_response`);
+            const fallback = `[ROLE_UNAVAILABLE] لم ينتج ${role.id} نصاً قابلاً للاستخدام، وسيواصل المجلس إلى الدور التالي.\n`;
+            roleResponse = fallback;
+            controller.enqueue(encoder.encode(fallback));
           }
 
           accumulatedContext += `${roleHeader(role.id)}${roleResponse.trim()}\n`;
         }
       } catch (error) {
         const message = friendlyError(error);
-        console.error("[council-v1.5] provider chain failed", {
+        console.error("[council-v1.5] council stream failed", {
           message: error instanceof Error ? error.message : String(error),
         });
         controller.enqueue(
