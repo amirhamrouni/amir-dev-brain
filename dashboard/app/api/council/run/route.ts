@@ -13,7 +13,7 @@ type RoleConfig = {
   instruction: string;
 };
 
-const MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+const MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-3.6-flash";
 const ROLE_TIMEOUT_MS = 13_000;
 
 const ROLES: RoleConfig[] = [
