@@ -1,3 +1,4 @@
+# Re-run async council E2E after bounded provider latency fix
 name: Run Autonomous Council E2E
 
 on:
@@ -111,7 +112,6 @@ jobs:
           assert data.get('realtime', {}).get('url'), data
           assert data.get('realtime', {}).get('anon_key'), data
           PY
-          # The request must be an enqueue/auth handshake, not a model-generation wait.
           test "$ELAPSED_MS" -lt 10000
 
       - name: Wait for Realtime transcript and completion
