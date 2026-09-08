@@ -1,0 +1,55 @@
+name: Memory API Vercel Env Audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/memory-env-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: team_UKAtfO6HzAtWy9WQ5YuXlPLC
+      VERCEL_PROJECT_ID: prj_jFc0iqPP0ofyCATBibwmGQbpLMjZ
+    steps:
+      - name: Inspect required variable metadata only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$VERCEL_TOKEN"
+          curl --fail-with-body --silent --show-error \
+            "https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/env?teamId=${VERCEL_ORG_ID}" \
+            --header "authorization: Bearer ${VERCEL_TOKEN}" \
+            --output /tmp/vercel-envs.json
+          python - <<'PY'
+          import json
+          data=json.load(open('/tmp/vercel-envs.json',encoding='utf-8'))
+          envs=data.get('envs', [])
+          required=['DATABASE_URL','QDRANT_URL','QDRANT_API_KEY','OPENAI_API_KEY']
+          found={}
+          for item in envs:
+              key=item.get('key')
+              if key not in required:
+                  continue
+              targets=item.get('target') or []
+              found.setdefault(key,[]).append({
+                  'target': targets,
+                  'type': item.get('type'),
+                  'gitBranch': item.get('gitBranch'),
+              })
+          for key in required:
+              rows=found.get(key,[])
+              prod=any('production' in (row.get('target') or []) and not row.get('gitBranch') for row in rows)
+              print(f'{key}: present={bool(rows)} production={prod} metadata={rows}')
+          missing=[key for key in required if not found.get(key)]
+          not_prod=[key for key in required if found.get(key) and not any('production' in (r.get('target') or []) and not r.get('gitBranch') for r in found[key])]
+          print('missing_keys=' + ','.join(missing))
+          print('not_production_scoped=' + ','.join(not_prod))
+          PY
