@@ -16,7 +16,9 @@ type RoleConfig = {
   timeoutMs: number;
 };
 
-const MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-3.6-flash";
+// Council Lite prioritizes predictable latency over maximum single-call depth.
+// Gemini 3.5 Flash-Lite is Google's stable low-latency model for sub-agent workflows.
+const MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
 
 const ROLES: RoleConfig[] = [
   {
