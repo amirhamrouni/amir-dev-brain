@@ -1,0 +1,70 @@
+name: Council v1.5 OpenAI lock and verify
+
+on:
+  push:
+    branches: [feature/council-v1-5-openai-engineer]
+    paths:
+      - "dashboard/package.json"
+      - "dashboard/app/api/council/run/route.ts"
+      - "dashboard/hooks/use-council-lite.ts"
+      - ".github/workflows/council-v15-openai-lock.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  install-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/council-v1-5-openai-engineer
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install OpenAI SDK and refresh lockfile
+        working-directory: dashboard
+        run: npm install openai@7.10.0 --save --no-fund --no-audit
+
+      - name: Typecheck dashboard
+        working-directory: dashboard
+        run: npm run typecheck
+
+      - name: Production build
+        working-directory: dashboard
+        run: npm run build
+
+      - name: Verify Council v1.5 provider routing
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'import OpenAI from "openai"' dashboard/app/api/council/run/route.ts
+          grep -q 'process.env.OPENAI_API_KEY' dashboard/app/api/council/run/route.ts
+          grep -q 'OPENAI_ENGINEER_MODEL = "gpt-4o-mini"' dashboard/app/api/council/run/route.ts
+          grep -q 'provider: "openai"' dashboard/app/api/council/run/route.ts
+          grep -q 'response.output_text.delta' dashboard/app/api/council/run/route.ts
+          grep -q 'Engineer · GPT-4o mini' dashboard/hooks/use-council-lite.ts
+          grep -q '"openai": "\^7.10.0"' dashboard/package.json
+          grep -q '"node_modules/openai"' dashboard/package-lock.json
+
+      - name: Commit npm install result
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- dashboard/package.json dashboard/package-lock.json; then
+            echo "OpenAI dependency and lockfile already synchronized."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dashboard/package.json dashboard/package-lock.json
+          git commit -m "Lock OpenAI SDK for Council v1.5"
+          git push origin HEAD:feature/council-v1-5-openai-engineer
