@@ -27,12 +27,22 @@ async function cleanupSmokeRecord() {
 
   try {
     await ensureDecisionCollection();
-    await getQdrantClient().delete(DECISION_COLLECTION, {
-      wait: true,
+    const client = getQdrantClient();
+    const existing = await client.scroll(DECISION_COLLECTION, {
+      limit: 20,
+      with_payload: true,
+      with_vector: false,
       filter: {
         must: [{ key: "decisionId", match: { value: TEST_ID } }],
       },
     });
+    const pointIds = existing.points.map((point) => point.id);
+    if (pointIds.length > 0) {
+      await client.delete(DECISION_COLLECTION, {
+        wait: true,
+        points: pointIds,
+      });
+    }
   } catch (error) {
     result.qdrant = "FAIL";
     console.error("[memory-smoke] qdrant cleanup failed", {
