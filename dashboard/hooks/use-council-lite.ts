@@ -23,10 +23,10 @@ export type CouncilDecision = {
 };
 
 const LABELS: Record<StreamRole, { key: RoleKey; modelLabel: string; title: string; tone: "blue" | "red" }> = {
-  Architect: { key: "architect", modelLabel: "Architect", title: "المعمارية", tone: "blue" },
-  Critic: { key: "critic", modelLabel: "Critic", title: "النقد والاعتراض", tone: "red" },
-  Engineer: { key: "engineer", modelLabel: "Engineer", title: "الهندسة والتنفيذ", tone: "blue" },
-  Judge: { key: "judge", modelLabel: "Judge", title: "الحكم والخلاصة", tone: "red" },
+  Architect: { key: "architect", modelLabel: "Architect · Gemini", title: "المعمارية", tone: "blue" },
+  Critic: { key: "critic", modelLabel: "Critic · Gemini", title: "النقد والاعتراض", tone: "red" },
+  Engineer: { key: "engineer", modelLabel: "Engineer · GPT-4o mini", title: "الهندسة والتنفيذ", tone: "blue" },
+  Judge: { key: "judge", modelLabel: "Judge · Gemini", title: "الحكم والخلاصة", tone: "red" },
 };
 
 const ROLE_ORDER: StreamRole[] = ["Architect", "Critic", "Engineer", "Judge"];
@@ -150,12 +150,16 @@ export function useCouncilLite() {
         if (!response.ok || !response.body) {
           const data = (await response.json().catch(() => ({}))) as { error?: string };
           if (data.error === "gemini_api_key_missing") {
-            throw new Error("مفتاح Gemini غير مضبوط في بيئة Vercel الخاصة بـ Council Lite.");
+            throw new Error("مفتاح Gemini غير مضبوط في بيئة Vercel الخاصة بـ Council v1.5.");
           }
-          throw new Error(data.error || `Council Lite HTTP ${response.status}`);
+          if (data.error === "openai_api_key_missing") {
+            throw new Error("مفتاح OpenAI غير مضبوط بعد. أضف OPENAI_API_KEY لتفعيل مقعد Engineer في Council v1.5.");
+          }
+          throw new Error(data.error || `Council v1.5 HTTP ${response.status}`);
         }
 
         const modelName = response.headers.get("x-council-model") || undefined;
+        const councilVersion = response.headers.get("x-council-version") || "v1.5";
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let fullText = "";
@@ -197,7 +201,7 @@ export function useCouncilLite() {
           synthesis,
           timestamp: new Date().toISOString(),
           status: "pending_approval",
-          council_version: "lite-v1",
+          council_version: councilVersion,
           model: modelName,
         };
 
