@@ -60,9 +60,6 @@ jobs:
       - name: Add autonomous AI council orchestrator
         run: node scripts/patch-council-orchestrator.mjs supabase/functions/open-brain-mcp/index.ts
 
-      - name: Add council realtime broadcasts
-        run: node scripts/patch-council-realtime.mjs supabase/functions/open-brain-mcp/index.ts
-
       - name: Apply legacy council budget patch
         run: node scripts/patch-council-reasoning.mjs supabase/functions/open-brain-mcp/index.ts
 
@@ -77,6 +74,9 @@ jobs:
 
       - name: Apply ST-004 metadata cache read path
         run: node scripts/patch-st004-metadata-cache.mjs supabase/functions/open-brain-mcp/index.ts
+
+      - name: Add council realtime broadcasts
+        run: node scripts/patch-council-realtime.mjs supabase/functions/open-brain-mcp/index.ts
 
       - name: Normalize generated TypeScript
         shell: bash
