@@ -23,7 +23,7 @@ jobs:
       VERCEL_PROJECT_ID: prj_jFc0iqPP0ofyCATBibwmGQbpLMjZ
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      GEMINI_MODEL: gemini-2.5-flash
+      GEMINI_MODEL: gemini-3.6-flash
       VERCEL_CLI_VERSION: 59.11.7
       VERCEL_TELEMETRY_DISABLED: 1
       CI: 1
