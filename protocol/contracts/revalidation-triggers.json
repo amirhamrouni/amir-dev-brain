@@ -1,0 +1,62 @@
+{
+  "contract": "revalidation-triggers",
+  "version": "1.0.0",
+  "default_max_age_days": 90,
+  "principle": "Revalidation is event-driven first and time-driven second. A trigger requests review of affected evidence and assumptions; it does not automatically revoke a decision.",
+  "triggers": {
+    "dependency_change": {
+      "default_drift": "MINOR_DRIFT",
+      "escalate_to_significant_when": [
+        "major_version_change",
+        "version_constraint_violated",
+        "critical_evidence_bound_to_component"
+      ]
+    },
+    "security_finding": {
+      "default_drift": "SIGNIFICANT_DRIFT",
+      "conditions": ["finding_materially_affects_decision_scope"]
+    },
+    "policy_change": {
+      "default_drift": "SIGNIFICANT_DRIFT",
+      "conditions": ["policy_semantics_affect_decision_or_authority"]
+    },
+    "tool_major_change": {
+      "default_drift": "SIGNIFICANT_DRIFT"
+    },
+    "tool_minor_change": {
+      "default_drift": "MINOR_DRIFT",
+      "escalate_to_significant_when": ["compatibility_range_violated", "critical_evidence_invalidated"]
+    },
+    "environment_change": {
+      "default_drift": "MINOR_DRIFT",
+      "escalate_to_significant_when": ["runtime_assumption_changed", "security_boundary_changed", "production_behavior_changed"]
+    },
+    "evidence_invalidated": {
+      "default_drift": "SIGNIFICANT_DRIFT"
+    },
+    "implementation_change": {
+      "default_drift": "MINOR_DRIFT",
+      "escalate_to_significant_when": ["decision_scope_behavior_changed", "evidence_no_longer_describes_implementation"]
+    },
+    "manual_review": {
+      "default_drift": "SYNCED",
+      "note": "Manual review can be requested without assuming drift."
+    },
+    "time_review_due": {
+      "default_drift": "SYNCED",
+      "effect": "set_decision_state_review_due_until_checked"
+    }
+  },
+  "review_policy": {
+    "default": {
+      "max_age_days": 90,
+      "review_after": null
+    },
+    "override": "Each decision may set review_after and/or max_age_days explicitly."
+  },
+  "effects": {
+    "SYNCED": ["keep_or_restore_ACTIVE_if_no_other_blocker"],
+    "MINOR_DRIFT": ["targeted_revalidation", "mark_affected_evidence_POTENTIALLY_STALE_when_applicable"],
+    "SIGNIFICANT_DRIFT": ["mark_affected_evidence_STALE_or_REVALIDATING", "set_decision_REVIEW_DUE_or_EVIDENCE_STALE", "block_deterministic_auto_merge"]
+  }
+}
