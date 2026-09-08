@@ -105,6 +105,7 @@ jobs:
       - name: Smoke test live Council Lite stream
         env:
           PUBLIC_PRODUCTION_URL: https://amir-brain-console.vercel.app
+          EXPECTED_MODEL: gemini-3.6-flash
         shell: bash
         run: |
           set -euo pipefail
@@ -117,11 +118,41 @@ jobs:
           open('/tmp/council-lite-payload.json','w',encoding='utf-8').write(json.dumps(payload,ensure_ascii=False))
           PY
 
-          curl --fail-with-body --silent --show-error --no-buffer --max-time 59 \
-            --request POST "$PUBLIC_PRODUCTION_URL/api/council/run" \
-            --header 'content-type: application/json' \
-            --data @/tmp/council-lite-payload.json \
-            --output /tmp/council-lite.ndjson
+          ALIAS_READY=0
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            rm -f /tmp/council-lite.ndjson
+            curl --silent --show-error --no-buffer --max-time 59 \
+              --request POST "$PUBLIC_PRODUCTION_URL/api/council/run" \
+              --header 'content-type: application/json' \
+              --data @/tmp/council-lite-payload.json \
+              --output /tmp/council-lite.ndjson || true
+
+            START_MODEL=$(python - <<'PY'
+          import json
+          model=''
+          try:
+            with open('/tmp/council-lite.ndjson',encoding='utf-8') as f:
+              for raw in f:
+                raw=raw.strip()
+                if not raw: continue
+                item=json.loads(raw)
+                if item.get('type')=='start':
+                  model=str(item.get('model',''))
+                  break
+          except Exception:
+            pass
+          print(model)
+          PY
+            )
+
+            echo "production_alias_attempt=$attempt model=${START_MODEL:-none}"
+            if [ "$START_MODEL" = "$EXPECTED_MODEL" ]; then
+              ALIAS_READY=1
+              break
+            fi
+            sleep 4
+          done
+          test "$ALIAS_READY" = "1"
 
           cat /tmp/council-lite.ndjson
           python - <<'PY'
