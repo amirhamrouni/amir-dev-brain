@@ -50,14 +50,16 @@ function sha256(value: unknown) {
 function normalizedStrings(value: unknown, field: string, requireItem: boolean) {
   if (!Array.isArray(value)) throw new Error(`invalid_scope_${field}`);
 
-  const normalized = [...new Set(
-    value.map((item) => {
-      if (typeof item !== "string" || !item.trim()) {
-        throw new Error(`invalid_scope_${field}`);
-      }
-      return item.trim();
-    }),
-  )].sort();
+  const normalized = [
+    ...new Set(
+      value.map((item) => {
+        if (typeof item !== "string" || !item.trim()) {
+          throw new Error(`invalid_scope_${field}`);
+        }
+        return item.trim();
+      }),
+    ),
+  ].sort();
 
   if (requireItem && normalized.length === 0) {
     throw new Error(`invalid_scope_${field}`);
@@ -183,10 +185,9 @@ export async function dispatchImplementationTask(
   if (duplicate) return duplicate;
 
   const taskId = `task_${randomUUID()}`;
-  let stored;
 
   try {
-    stored = await createImplementationTask({
+    await createImplementationTask({
       task_id: taskId,
       decision_id: decisionId,
       decision_revision: decisionRevision,
