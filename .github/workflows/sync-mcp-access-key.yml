@@ -2,6 +2,11 @@ name: Sync MCP Access Key
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/sync-mcp-access-key.yml"
+      - "supabase/functions/council-e2e-runner/**"
 
 permissions:
   contents: read
