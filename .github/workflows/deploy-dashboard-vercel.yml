@@ -23,6 +23,7 @@ jobs:
       VERCEL_PROJECT_ID: prj_jFc0iqPP0ofyCATBibwmGQbpLMjZ
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       GEMINI_MODEL: gemini-3.5-flash-lite
       VERCEL_CLI_VERSION: 59.11.7
       VERCEL_TELEMETRY_DISABLED: 1
@@ -39,8 +40,11 @@ jobs:
             exit 1
           fi
           if [ -z "$GEMINI_API_KEY" ]; then
-            echo "GEMINI_API_KEY GitHub secret is required for Council Lite." >&2
+            echo "GEMINI_API_KEY GitHub secret is required for Council v1.5." >&2
             exit 1
+          fi
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "OPENAI_API_KEY is not configured yet; deploy will proceed with Engineer seat gated until the key is added."
           fi
 
       - name: Setup Node
@@ -84,25 +88,29 @@ jobs:
       - name: Build production dashboard
         run: npx --yes "vercel@${VERCEL_CLI_VERSION}" build --prod --scope=amirhamrounis-projects --token="$VERCEL_TOKEN"
 
-      - name: Deploy production dashboard with Council Lite runtime env
+      - name: Deploy production dashboard with Council v1.5 runtime env
         id: deploy
         shell: bash
         run: |
           set -euo pipefail
-          npx --yes "vercel@${VERCEL_CLI_VERSION}" deploy \
-            --prebuilt \
-            --prod \
-            --scope=amirhamrounis-projects \
-            --token="$VERCEL_TOKEN" \
-            --env GEMINI_API_KEY="$GEMINI_API_KEY" \
-            --env GEMINI_MODEL="$GEMINI_MODEL" \
-            > deployment-url.txt
+          DEPLOY_ARGS=(
+            --prebuilt
+            --prod
+            --scope=amirhamrounis-projects
+            --token="$VERCEL_TOKEN"
+            --env GEMINI_API_KEY="$GEMINI_API_KEY"
+            --env GEMINI_MODEL="$GEMINI_MODEL"
+          )
+          if [ -n "$OPENAI_API_KEY" ]; then
+            DEPLOY_ARGS+=(--env OPENAI_API_KEY="$OPENAI_API_KEY")
+          fi
+          npx --yes "vercel@${VERCEL_CLI_VERSION}" deploy "${DEPLOY_ARGS[@]}" > deployment-url.txt
           cat deployment-url.txt
           DEPLOYMENT_URL="$(tail -n 1 deployment-url.txt | tr -d '\r')"
           test -n "$DEPLOYMENT_URL"
           echo "url=$DEPLOYMENT_URL" >> "$GITHUB_OUTPUT"
 
-      - name: Smoke test live Council Lite stream
+      - name: Smoke test live Council v1.5 stream
         env:
           PUBLIC_PRODUCTION_URL: https://amir-brain-console.vercel.app
           EXPECTED_MODEL: gemini-3.5-flash-lite
@@ -112,27 +120,61 @@ jobs:
           python - <<'PY'
           import json
           payload = {
-            "userQuery": "اختبار إنتاج Council Lite فقط: اجعل كل دور مختصراً، وعلى Critic وضع [CONFLICT] لاعتراض حقيقي، وعلى Judge إنهاء الرد بـ [SYNTHESIS]."
+            "userQuery": "اختبار إنتاج Council v1.5 فقط: اجعل كل دور مختصراً، وعلى Critic وضع [CONFLICT] لاعتراض حقيقي، وعلى Judge إنهاء الرد بـ [SYNTHESIS]."
           }
-          open('/tmp/council-lite-payload.json','w',encoding='utf-8').write(json.dumps(payload,ensure_ascii=False))
+          open('/tmp/council-v15-payload.json','w',encoding='utf-8').write(json.dumps(payload,ensure_ascii=False))
           PY
 
-          ALIAS_READY=0
+          if [ -z "$OPENAI_API_KEY" ]; then
+            READY=0
+            for attempt in 1 2 3 4 5 6 7 8 9 10; do
+              rm -f /tmp/council-v15.txt
+              HTTP_CODE=$(curl --silent --show-error --max-time 20 \
+                --write-out '%{http_code}' \
+                --request POST "$PUBLIC_PRODUCTION_URL/api/council/run" \
+                --header 'content-type: application/json' \
+                --data @/tmp/council-v15-payload.json \
+                --output /tmp/council-v15.txt || true)
+              echo "production_alias_attempt=$attempt http=${HTTP_CODE:-none}"
+              if [ "$HTTP_CODE" = "503" ] && grep -q 'openai_api_key_missing' /tmp/council-v15.txt; then
+                READY=1
+                break
+              fi
+              sleep 4
+            done
+            test "$READY" = "1"
+            echo "Council v1.5 production code is live; Engineer seat is correctly gated until OPENAI_API_KEY is configured."
+            exit 0
+          fi
+
+          READY=0
           for attempt in 1 2 3 4 5 6 7 8 9 10; do
-            rm -f /tmp/council-lite.txt /tmp/council-lite.headers
+            rm -f /tmp/council-v15.txt /tmp/council-v15.headers
             curl --silent --show-error --no-buffer --max-time 59 \
-              --dump-header /tmp/council-lite.headers \
+              --dump-header /tmp/council-v15.headers \
               --request POST "$PUBLIC_PRODUCTION_URL/api/council/run" \
               --header 'content-type: application/json' \
-              --data @/tmp/council-lite-payload.json \
-              --output /tmp/council-lite.txt || true
+              --data @/tmp/council-v15-payload.json \
+              --output /tmp/council-v15.txt || true
 
-            ACTIVE_MODEL=$(python - <<'PY'
+            ACTIVE_VERSION=$(python - <<'PY'
+          version=''
+          try:
+            with open('/tmp/council-v15.headers',encoding='utf-8',errors='ignore') as f:
+              for raw in f:
+                if raw.lower().startswith('x-council-version:'):
+                  version=raw.split(':',1)[1].strip()
+          except Exception:
+            pass
+          print(version)
+          PY
+            )
+            ENGINEER_MODEL=$(python - <<'PY'
           model=''
           try:
-            with open('/tmp/council-lite.headers',encoding='utf-8',errors='ignore') as f:
+            with open('/tmp/council-v15.headers',encoding='utf-8',errors='ignore') as f:
               for raw in f:
-                if raw.lower().startswith('x-council-model:'):
+                if raw.lower().startswith('x-council-engineer-model:'):
                   model=raw.split(':',1)[1].strip()
           except Exception:
             pass
@@ -140,23 +182,23 @@ jobs:
           PY
             )
 
-            echo "production_alias_attempt=$attempt model=${ACTIVE_MODEL:-none}"
-            if [ "$ACTIVE_MODEL" = "$EXPECTED_MODEL" ]; then
-              ALIAS_READY=1
+            echo "production_alias_attempt=$attempt version=${ACTIVE_VERSION:-none} engineer=${ENGINEER_MODEL:-none}"
+            if [ "$ACTIVE_VERSION" = "v1.5" ] && [ "$ENGINEER_MODEL" = "gpt-4o-mini" ]; then
+              READY=1
               break
             fi
             sleep 4
           done
-          test "$ALIAS_READY" = "1"
+          test "$READY" = "1"
 
-          cat /tmp/council-lite.txt
+          cat /tmp/council-v15.txt
           python - <<'PY'
-          text=open('/tmp/council-lite.txt',encoding='utf-8').read()
+          text=open('/tmp/council-v15.txt',encoding='utf-8').read()
           assert '### Error' not in text, text
           for role in ('Architect','Critic','Engineer','Judge'):
             assert f'### {role}' in text, role
           assert '[CONFLICT]' in text, 'missing conflict marker'
           assert '[SYNTHESIS]' in text, 'missing synthesis marker'
           assert len(text.strip()) > 200, 'stream unexpectedly short'
-          print('Council Lite production plain-text stream E2E PASS')
+          print('Council v1.5 mixed Gemini + OpenAI production stream E2E PASS')
           PY
