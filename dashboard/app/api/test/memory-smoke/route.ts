@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { NextRequest } from "next/server";
 import {
   getDecisionById,
@@ -19,6 +20,17 @@ export const maxDuration = 60;
 const TEST_ID = "TEST-001";
 const TEST_PROJECT = "amir-dev-brain";
 
+function pointIdForDecision(decisionId: string) {
+  const bytes = createHash("sha256")
+    .update(`amir-dev-brain:${decisionId}`)
+    .digest()
+    .subarray(0, 16);
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = bytes.toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 async function cleanupSmokeRecord() {
   const result = {
     qdrant: "PASS" as "PASS" | "FAIL",
@@ -27,22 +39,10 @@ async function cleanupSmokeRecord() {
 
   try {
     await ensureDecisionCollection();
-    const client = getQdrantClient();
-    const existing = await client.scroll(DECISION_COLLECTION, {
-      limit: 20,
-      with_payload: true,
-      with_vector: false,
-      filter: {
-        must: [{ key: "decisionId", match: { value: TEST_ID } }],
-      },
+    await getQdrantClient().delete(DECISION_COLLECTION, {
+      wait: true,
+      points: [pointIdForDecision(TEST_ID)],
     });
-    const pointIds = existing.points.map((point) => point.id);
-    if (pointIds.length > 0) {
-      await client.delete(DECISION_COLLECTION, {
-        wait: true,
-        points: pointIds,
-      });
-    }
   } catch (error) {
     result.qdrant = "FAIL";
     console.error("[memory-smoke] qdrant cleanup failed", {
@@ -129,22 +129,19 @@ async function runSmoke() {
     };
 
     await ensureDecisionCollection();
-    const qdrantResult = await getQdrantClient().scroll(DECISION_COLLECTION, {
-      limit: 5,
+    const qdrantResult = await getQdrantClient().retrieve(DECISION_COLLECTION, {
+      ids: [pointIdForDecision(TEST_ID)],
       with_payload: true,
       with_vector: false,
-      filter: {
-        must: [{ key: "decisionId", match: { value: TEST_ID } }],
-      },
     });
 
-    const qdrantFound = qdrantResult.points.some(
+    const qdrantFound = qdrantResult.some(
       (point) => point.payload?.decisionId === TEST_ID,
     );
     steps.qdrant = {
       status: qdrantFound ? "PASS" : "FAIL",
       found: qdrantFound,
-      points: qdrantResult.points.length,
+      points: qdrantResult.length,
     };
 
     const byIds = await getDecisionsByIds([TEST_ID]);
