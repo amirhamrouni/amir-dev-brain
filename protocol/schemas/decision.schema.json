@@ -20,112 +20,49 @@
     "evidence_links"
   ],
   "properties": {
-    "schema_version": {
-      "type": "string",
-      "const": "1.0.0"
-    },
+    "schema_version": { "type": "string", "const": "1.0.0" },
     "decision_id": {
       "type": "string",
       "pattern": "^[A-Z][A-Z0-9_-]*-[0-9]{3,}$",
       "examples": ["ADB-002", "ET-001"]
     },
-    "revision": {
-      "type": "integer",
-      "minimum": 1,
-      "default": 1
-    },
-    "project": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 120
-    },
-    "title": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 240
-    },
-    "statement": {
-      "type": "string",
-      "minLength": 1
-    },
-    "rationale": {
-      "type": "string",
-      "default": ""
-    },
+    "revision": { "type": "integer", "minimum": 1, "default": 1 },
+    "project": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "title": { "type": "string", "minLength": 1, "maxLength": 240 },
+    "statement": { "type": "string", "minLength": 1 },
+    "rationale": { "type": "string", "default": "" },
     "scope": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "includes": {
-          "type": "array",
-          "items": { "type": "string" },
-          "default": []
-        },
-        "excludes": {
-          "type": "array",
-          "items": { "type": "string" },
-          "default": []
-        }
+        "includes": { "type": "array", "items": { "type": "string" }, "default": [] },
+        "excludes": { "type": "array", "items": { "type": "string" }, "default": [] }
       },
-      "default": {
-        "includes": [],
-        "excludes": []
-      }
+      "default": { "includes": [], "excludes": [] }
     },
     "state": {
       "type": "string",
-      "enum": [
-        "ACTIVE",
-        "REVIEW_DUE",
-        "EVIDENCE_STALE",
-        "REVALIDATING",
-        "SUPERSEDED",
-        "REVOKED"
-      ]
+      "enum": ["ACTIVE", "REVIEW_DUE", "EVIDENCE_STALE", "REVALIDATING", "SUPERSEDED", "REVOKED"]
     },
     "authority": {
       "type": "object",
       "additionalProperties": false,
       "required": ["approved_by", "approved_at", "approval_mode"],
       "properties": {
-        "approved_by": {
-          "type": "string",
-          "minLength": 1
-        },
-        "approved_at": {
-          "type": "string",
-          "format": "date-time"
-        },
+        "approved_by": { "type": "string", "minLength": 1 },
+        "approved_at": { "type": "string", "format": "date-time" },
         "approval_mode": {
           "type": "string",
-          "enum": [
-            "OWNER_APPROVAL",
-            "COUNCIL_APPROVAL",
-            "EXECUTIVE_OVERRIDE",
-            "MIGRATED_LEGACY"
-          ]
+          "enum": ["OWNER_APPROVAL", "OWNER_AFTER_COUNCIL", "EXECUTIVE_OVERRIDE", "MIGRATED_LEGACY"]
         },
-        "approval_ref": {
-          "type": ["string", "null"],
-          "default": null
-        }
+        "approval_ref": { "type": ["string", "null"], "default": null }
       }
     },
-    "created_at": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "updated_at": {
-      "type": ["string", "null"],
-      "format": "date-time",
-      "default": null
-    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": ["string", "null"], "format": "date-time", "default": null },
     "supersedes": {
       "type": "array",
-      "items": {
-        "type": "string",
-        "pattern": "^[A-Z][A-Z0-9_-]*-[0-9]{3,}$"
-      },
+      "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9_-]*-[0-9]{3,}$" },
       "uniqueItems": true,
       "default": []
     },
@@ -139,16 +76,8 @@
       "additionalProperties": false,
       "required": ["max_age_days", "triggers"],
       "properties": {
-        "review_after": {
-          "type": ["string", "null"],
-          "format": "date-time",
-          "default": null
-        },
-        "max_age_days": {
-          "type": ["integer", "null"],
-          "minimum": 1,
-          "default": 90
-        },
+        "review_after": { "type": ["string", "null"], "format": "date-time", "default": null },
+        "max_age_days": { "type": ["integer", "null"], "minimum": 1, "default": 90 },
         "triggers": {
           "type": "array",
           "uniqueItems": true,
@@ -166,13 +95,7 @@
               "manual_review"
             ]
           },
-          "default": [
-            "dependency_change",
-            "security_finding",
-            "policy_change",
-            "tool_major_change",
-            "evidence_invalidated"
-          ]
+          "default": ["dependency_change", "security_finding", "policy_change", "tool_major_change", "evidence_invalidated"]
         }
       }
     },
@@ -183,52 +106,20 @@
         "additionalProperties": false,
         "required": ["component", "kind", "observed_version", "binding_mode"],
         "properties": {
-          "component": {
-            "type": "string",
-            "minLength": 1
-          },
+          "component": { "type": "string", "minLength": 1 },
           "kind": {
             "type": "string",
-            "enum": [
-              "DEPENDENCY",
-              "TOOL",
-              "POLICY",
-              "RUNTIME",
-              "WORKFLOW",
-              "MODEL",
-              "SCANNER",
-              "SCHEMA"
-            ]
+            "enum": ["DEPENDENCY", "TOOL", "POLICY", "RUNTIME", "WORKFLOW", "MODEL", "SCANNER", "SCHEMA"]
           },
-          "observed_version": {
-            "type": "string",
-            "minLength": 1
-          },
-          "version_constraint": {
-            "type": ["string", "null"],
-            "default": null
-          },
+          "observed_version": { "type": "string", "minLength": 1 },
+          "version_constraint": { "type": ["string", "null"], "default": null },
           "binding_mode": {
             "type": "string",
-            "enum": [
-              "EVIDENCE_VALIDATION",
-              "PINNED_REQUIREMENT",
-              "INFORMATIONAL"
-            ]
+            "enum": ["EVIDENCE_VALIDATION", "PINNED_REQUIREMENT", "INFORMATIONAL"]
           },
-          "source": {
-            "type": ["string", "null"],
-            "default": null
-          },
-          "commit_sha": {
-            "type": ["string", "null"],
-            "pattern": "^[0-9a-fA-F]{7,40}$",
-            "default": null
-          },
-          "policy_id": {
-            "type": ["string", "null"],
-            "default": null
-          }
+          "source": { "type": ["string", "null"], "default": null },
+          "commit_sha": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{7,40}$", "default": null },
+          "policy_id": { "type": ["string", "null"], "default": null }
         }
       },
       "default": []
@@ -240,40 +131,13 @@
         "additionalProperties": false,
         "required": ["evidence_id", "relation", "status", "captured_at", "locator"],
         "properties": {
-          "evidence_id": {
-            "type": "string",
-            "minLength": 1
-          },
-          "relation": {
-            "type": "string",
-            "enum": ["SUPPORTS", "CONTRADICTS", "CONTEXT", "REVALIDATES"]
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "VALID",
-              "POTENTIALLY_STALE",
-              "STALE",
-              "REVALIDATING",
-              "INVALID"
-            ]
-          },
-          "captured_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "locator": {
-            "type": "string",
-            "minLength": 1
-          },
-          "content_hash": {
-            "type": ["string", "null"],
-            "default": null
-          },
-          "summary": {
-            "type": ["string", "null"],
-            "default": null
-          },
+          "evidence_id": { "type": "string", "minLength": 1 },
+          "relation": { "type": "string", "enum": ["SUPPORTS", "CONTRADICTS", "CONTEXT", "REVALIDATES"] },
+          "status": { "type": "string", "enum": ["VALID", "POTENTIALLY_STALE", "STALE", "REVALIDATING", "INVALID"] },
+          "captured_at": { "type": "string", "format": "date-time" },
+          "locator": { "type": "string", "minLength": 1 },
+          "content_hash": { "type": ["string", "null"], "default": null },
+          "summary": { "type": ["string", "null"], "default": null },
           "bound_components": {
             "type": "array",
             "items": { "type": "string" },
@@ -288,64 +152,25 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "last_checked_at": {
-          "type": ["string", "null"],
-          "format": "date-time",
-          "default": null
-        },
+        "last_checked_at": { "type": ["string", "null"], "format": "date-time", "default": null },
         "last_result": {
           "type": ["string", "null"],
           "enum": ["SYNCED", "MINOR_DRIFT", "SIGNIFICANT_DRIFT", null],
           "default": null
         },
-        "pending_reasons": {
-          "type": "array",
-          "items": { "type": "string" },
-          "default": []
-        }
+        "pending_reasons": { "type": "array", "items": { "type": "string" }, "default": [] }
       },
-      "default": {
-        "last_checked_at": null,
-        "last_result": null,
-        "pending_reasons": []
-      }
+      "default": { "last_checked_at": null, "last_result": null, "pending_reasons": [] }
     },
-    "alternatives_rejected": {
-      "type": "array",
-      "items": { "type": "string" },
-      "default": []
-    },
-    "risks": {
-      "type": "array",
-      "items": { "type": "string" },
-      "default": []
-    },
-    "action_items": {
-      "type": "array",
-      "items": { "type": "string" },
-      "default": []
-    },
-    "tags": {
-      "type": "array",
-      "items": { "type": "string" },
-      "uniqueItems": true,
-      "default": []
-    }
+    "alternatives_rejected": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "risks": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "action_items": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "tags": { "type": "array", "items": { "type": "string" }, "uniqueItems": true, "default": [] }
   },
   "allOf": [
     {
-      "if": {
-        "properties": {
-          "state": { "const": "SUPERSEDED" }
-        },
-        "required": ["state"]
-      },
-      "then": {
-        "required": ["superseded_by"],
-        "properties": {
-          "superseded_by": { "type": "string" }
-        }
-      }
+      "if": { "properties": { "state": { "const": "SUPERSEDED" } }, "required": ["state"] },
+      "then": { "required": ["superseded_by"], "properties": { "superseded_by": { "type": "string" } } }
     }
   ]
 }
