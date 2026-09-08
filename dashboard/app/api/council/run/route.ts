@@ -11,33 +11,47 @@ type RoleConfig = {
   id: RoleId;
   label: string;
   instruction: string;
+  maxWords: number;
+  maxOutputTokens: number;
+  timeoutMs: number;
 };
 
 const MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-3.6-flash";
-const ROLE_TIMEOUT_MS = 13_000;
 
 const ROLES: RoleConfig[] = [
   {
     id: "architect",
     label: "Architect",
+    maxWords: 120,
+    maxOutputTokens: 420,
+    timeoutMs: 11_500,
     instruction:
-      "ابدأ من سؤال أمير مباشرة. اقترح أبسط حل معماري قوي وقابل للتنفيذ. اذكر الافتراضات، الحدود، المخاطر، وما الذي يجب ألا نضيفه الآن. لا تجامل.",
+      "ابدأ من سؤال أمير مباشرة. اقترح أبسط حل معماري قوي وقابل للتنفيذ. اذكر الافتراضات والحدود والمخاطر وما الذي يجب ألا نضيفه الآن. لا تجامل.",
   },
   {
     id: "critic",
     label: "Critic",
+    maxWords: 120,
+    maxOutputTokens: 420,
+    timeoutMs: 12_000,
     instruction:
       "راجع سؤال أمير ورد Architect بدقة. استخرج الاعتراضات والمخاطر والثغرات. كل اعتراض جوهري يجب أن يبدأ حرفياً بالوسم [CONFLICT_FLAG] ثم وصف قصير وواضح. لا تعِد صياغة رد المعماري فقط.",
   },
   {
     id: "engineer",
     label: "Engineer",
+    maxWords: 140,
+    maxOutputTokens: 480,
+    timeoutMs: 12_500,
     instruction:
-      "اقرأ سؤال أمير ورد Architect واعتراضات Critic. حوّل النقاش إلى آليات تنفيذ تقنية عملية: ملفات/واجهات/تدفق بيانات/اختبارات/ترتيب خطوات. عالج كل [CONFLICT_FLAG] بقرار تقني محدد.",
+      "اقرأ سؤال أمير ورد Architect واعتراضات Critic. حوّل النقاش إلى آليات تنفيذ تقنية عملية: ملفات وواجهات وتدفق بيانات واختبارات وترتيب خطوات. عالج كل [CONFLICT_FLAG] بقرار تقني محدد.",
   },
   {
     id: "judge",
     label: "Judge",
+    maxWords: 180,
+    maxOutputTokens: 600,
+    timeoutMs: 14_000,
     instruction:
       "اقرأ السؤال وكل المداولات السابقة. احسم الخلافات واكتب Synthesis نهائية قابلة للتنفيذ. نظّمها إلى: الإجماع، الخلافات المحسومة، القرار المقترح، مخاطر متبقية، وخطوات التنفيذ. هذه توصية مجلس وليست قراراً معتمداً قبل موافقة أمير.",
   },
@@ -60,7 +74,7 @@ function buildPrompt(role: RoleConfig, question: string, outputs: Partial<RoleOu
   return [
     `أنت ${role.label} داخل Council Lite الخاص بـ Amir Dev Brain.`,
     role.instruction,
-    "اكتب بالعربية الواضحة. كن مباشراً ومحدداً ومفيداً، وتجنب الحشو.",
+    `اكتب بالعربية الواضحة في حد أقصى ${role.maxWords} كلمة. ابدأ بالنتيجة مباشرة. لا تكتب تفكيرك الداخلي ولا تشرح تعليماتك.`,
     `## سؤال أمير\n${question}`,
     prior ? `## المداولات السابقة\n${prior}` : "",
   ]
@@ -73,6 +87,7 @@ function extractGeminiText(data: string) {
     const parsed = JSON.parse(data);
     return (
       parsed?.candidates?.[0]?.content?.parts
+        ?.filter((part: { thought?: boolean }) => part?.thought !== true)
         ?.map((part: { text?: string }) => part?.text || "")
         .join("") || ""
     );
@@ -90,8 +105,8 @@ async function streamRole(
   const key = geminiKey();
   if (!key) throw new Error("gemini_api_key_missing");
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), ROLE_TIMEOUT_MS);
+  const abortController = new AbortController();
+  const timer = setTimeout(() => abortController.abort(), role.timeoutMs);
 
   try {
     const response = await fetch(
@@ -105,12 +120,15 @@ async function streamRole(
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: buildPrompt(role, question, outputs) }] }],
           generationConfig: {
-            temperature: role.id === "judge" ? 0.2 : 0.45,
-            maxOutputTokens: role.id === "judge" ? 1000 : 800,
+            maxOutputTokens: role.maxOutputTokens,
+            thinkingConfig: {
+              thinkingLevel: "minimal",
+              includeThoughts: false,
+            },
           },
         }),
         cache: "no-store",
-        signal: controller.signal,
+        signal: abortController.signal,
       },
     );
 
