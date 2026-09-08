@@ -30,19 +30,19 @@ function addBroadcastAfter(exact, eventExpr, textExpr) {
 }
 
 addBroadcastAfter(
-  '        transcript.push("## Gemini Round 1 (" + g1.model + ")\\n" + g1.text);',
-  '"gemini-1"',
-  '"## Gemini Round 1 (" + g1.model + ")\\n" + g1.text'
+  '        transcript.push("## Architecture Round 1 (" + g1.model + ")\\n" + g1.text);',
+  '"architecture-1"',
+  '"## Architecture Round 1 (" + g1.model + ")\\n" + g1.text'
 );
 addBroadcastAfter(
-  '          transcript.push("## OpenAI Round " + i + " (" + o.model + ")\\n" + o.text);',
-  '"openai-" + i',
-  '"## OpenAI Round " + i + " (" + o.model + ")\\n" + o.text'
+  '          transcript.push("## Engineering Round " + i + " (" + o.model + ")\\n" + o.text);',
+  '"engineering-" + i',
+  '"## Engineering Round " + i + " (" + o.model + ")\\n" + o.text'
 );
 addBroadcastAfter(
-  '            transcript.push("## Gemini Round " + (i + 1) + " (" + g.model + ")\\n" + g.text);',
-  '"gemini-" + (i + 1)',
-  '"## Gemini Round " + (i + 1) + " (" + g.model + ")\\n" + g.text'
+  '            transcript.push("## Architecture Round " + (i + 1) + " (" + g.model + ")\\n" + g.text);',
+  '"architecture-" + (i + 1)',
+  '"## Architecture Round " + (i + 1) + " (" + g.model + ")\\n" + g.text'
 );
 addBroadcastAfter(
   '        transcript.push("## Council Synthesis (" + synthesis.model + ")\\n" + synthesis.text);',
