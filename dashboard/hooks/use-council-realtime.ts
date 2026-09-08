@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createClient, type RealtimeChannel, type SupabaseClient } from "@supabase/supabase-js";
 import type { CouncilEvent, CouncilSynthesis, CouncilMessage } from "@/types/council";
 
 export type RealtimeState = "idle" | "ready" | "running" | "error";
 
 const COUNCIL_API = "https://hdcpvwsndxxflbednvsq.supabase.co/functions/v1/council-e2e-runner";
+const MAX_REALTIME_WAIT_MS = 245_000;
 
 function cleanProviderTitle(raw: string) {
   return raw.replace(/^#+\s*/, "").replace(/\s*\([^)]*\)\s*$/, "").trim();
@@ -31,7 +33,7 @@ function parseCouncilTranscript(text: string): CouncilEvent[] {
     if (/Council Synthesis/i.test(title)) {
       const summary = firstParagraph(body);
       const synthesis: CouncilSynthesis = {
-        id: `synthesis-${Date.now()}`,
+        id: `synthesis-${crypto.randomUUID()}`,
         title: "خلاصة المجلس",
         summary,
         recommendation: body,
@@ -44,7 +46,7 @@ function parseCouncilTranscript(text: string): CouncilEvent[] {
     const isGemini = /^Gemini/i.test(title);
     const round = title.match(/(\d+)/)?.[1] || String(index + 1);
     const message: CouncilMessage = {
-      id: `council-${index}-${Date.now()}`,
+      id: `council-${crypto.randomUUID()}`,
       modelLabel: isGemini ? "نموذج جيميني" : "نموذج OpenAI",
       tone: isGemini ? "blue" : "red",
       title: `الجولة ${round}${provider ? ` · ${provider}` : ""}`,
@@ -57,7 +59,7 @@ function parseCouncilTranscript(text: string): CouncilEvent[] {
       events.push({
         type: "conflict",
         flag: {
-          id: `conflict-${index}-${Date.now()}`,
+          id: `conflict-${crypto.randomUUID()}`,
           code: "COUNCIL_CONFLICT",
           detail: "رُصد اعتراض أو خطر يحتاج للمراجعة داخل هذه الجولة.",
           timestamp: now(),
@@ -70,7 +72,7 @@ function parseCouncilTranscript(text: string): CouncilEvent[] {
     events.push({
       type: "message",
       message: {
-        id: `council-result-${Date.now()}`,
+        id: `council-result-${crypto.randomUUID()}`,
         modelLabel: "محرك المجلس",
         tone: "blue",
         title: "نتيجة النقاش",
@@ -101,15 +103,32 @@ export function useCouncilRealtime() {
   const [events, setEvents] = useState<CouncilEvent[]>([]);
   const [state, setState] = useState<RealtimeState>("idle");
   const [error, setError] = useState<string | null>(null);
+  const activeRef = useRef<{ client: SupabaseClient; channel: RealtimeChannel; timer: ReturnType<typeof setTimeout> } | null>(null);
+
+  const cleanupActive = useCallback(async () => {
+    const active = activeRef.current;
+    activeRef.current = null;
+    if (!active) return;
+    clearTimeout(active.timer);
+    await active.client.removeChannel(active.channel).catch(() => undefined);
+  }, []);
+
+  useEffect(() => () => { void cleanupActive(); }, [cleanupActive]);
 
   const runDebate = useCallback(async ({ project, question, rounds, accessKey }: { project: string; question: string; rounds: number; accessKey: string }) => {
     const normalizedKey = accessKey.trim();
     if (!normalizedKey) throw new Error("أدخل مفتاح الوصول الخاص أولاً.");
+
+    await cleanupActive();
     setState("running");
     setError(null);
     setEvents([]);
 
+    const runId = crypto.randomUUID();
+
     try {
+      // This fetch is only an enqueue/auth handshake. It must return immediately and
+      // never wait for model generation. All debate output arrives via Realtime below.
       const response = await fetch(COUNCIL_API, {
         method: "POST",
         cache: "no-store",
@@ -117,27 +136,69 @@ export function useCouncilRealtime() {
           "content-type": "application/json",
           "x-amir-key": normalizedKey,
         },
-        body: JSON.stringify({ project_slug: project.trim() || "amir-dev-brain", question, rounds }),
+        body: JSON.stringify({ project_slug: project.trim() || "amir-dev-brain", question, rounds, run_id: runId }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data?.ok) {
-        throw new Error(friendlyCouncilError(response.status, data?.error));
+      if (!response.ok || !data?.ok || !data?.accepted) {
+        throw new Error(friendlyCouncilError(response.status, data?.error || data?.message));
       }
-      const text = (data?.result?.content || [])
-        .filter((item: unknown) => item && typeof item === "object" && "text" in item)
-        .map((item: { text?: unknown }) => String(item.text || ""))
-        .join("\n");
-      const parsed = parseCouncilTranscript(text);
-      setEvents(parsed);
-      setState("ready");
-      return parsed;
+      if (!data?.realtime?.url || !data?.realtime?.anon_key) {
+        throw new Error("لم يرجع الخادم إعداد Realtime اللازم لمتابعة المجلس.");
+      }
+
+      const client = createClient(data.realtime.url, data.realtime.anon_key, {
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      });
+      const channelName = String(data.channel || `council:${runId}`);
+      const channel = client.channel(channelName, { config: { broadcast: { self: false } } });
+
+      const failRealtime = (message: string) => {
+        setError(message);
+        setState("error");
+        void cleanupActive();
+      };
+
+      channel
+        .on("broadcast", { event: "status" }, ({ payload }) => {
+          if (payload?.run_id !== runId) return;
+          if (payload?.status === "started") setState("running");
+        })
+        .on("broadcast", { event: "transcript" }, ({ payload }) => {
+          if (payload?.run_id !== runId || typeof payload?.text !== "string") return;
+          const parsed = parseCouncilTranscript(payload.text);
+          if (parsed.length) setEvents((current) => [...current, ...parsed]);
+        })
+        .on("broadcast", { event: "done" }, ({ payload }) => {
+          if (payload?.run_id !== runId) return;
+          setState("ready");
+          void cleanupActive();
+        })
+        .on("broadcast", { event: "error" }, ({ payload }) => {
+          if (payload?.run_id !== runId) return;
+          failRealtime(String(payload?.message || "تعذّر إكمال نقاش المجلس."));
+        });
+
+      const timer = setTimeout(() => {
+        failRealtime("انتهت مهلة انتظار Realtime دون حدث ختامي من المجلس.");
+      }, MAX_REALTIME_WAIT_MS);
+      activeRef.current = { client, channel, timer };
+
+      channel.subscribe((status) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          failRealtime("تعذّر فتح قناة Supabase Realtime للمجلس.");
+        }
+      });
+
+      // Fire-and-forget from the UI perspective: debate generation is no longer awaited.
+      return [] as CouncilEvent[];
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
       setError(message);
       setState("error");
+      await cleanupActive();
       throw cause;
     }
-  }, []);
+  }, [cleanupActive]);
 
   const latestSynthesis = useMemo<CouncilSynthesis | null>(() => {
     for (let index = events.length - 1; index >= 0; index -= 1) {
