@@ -53,6 +53,25 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --no-fund
 
+      - name: Normalize Vercel project for Next.js runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error \
+            --request PATCH \
+            "https://api.vercel.com/v9/projects/${VERCEL_PROJECT_ID}?teamId=${VERCEL_ORG_ID}" \
+            --header "authorization: Bearer ${VERCEL_TOKEN}" \
+            --header 'content-type: application/json' \
+            --data '{"framework":"nextjs","outputDirectory":null,"buildCommand":"npm run build"}' \
+            --output /tmp/vercel-project.json
+          python - <<'PY'
+          import json
+          data=json.load(open('/tmp/vercel-project.json',encoding='utf-8'))
+          assert data.get('framework') == 'nextjs', data.get('framework')
+          assert data.get('outputDirectory') in (None, ''), data.get('outputDirectory')
+          print('Vercel project normalized for dynamic Next.js runtime')
+          PY
+
       - name: Reset local Vercel link state
         run: rm -rf .vercel
 
