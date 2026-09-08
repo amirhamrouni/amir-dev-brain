@@ -112,41 +112,36 @@ jobs:
           python - <<'PY'
           import json
           payload = {
-            "project": "amir-dev-brain",
-            "question": "اختبار إنتاج Council Lite فقط: اجعل كل دور مختصراً جداً في نقطتين كحد أقصى، وتأكد أن Critic يضع [CONFLICT_FLAG] لاعتراض واحد حقيقي."
+            "userQuery": "اختبار إنتاج Council Lite فقط: اجعل كل دور مختصراً، وعلى Critic وضع [CONFLICT] لاعتراض حقيقي، وعلى Judge إنهاء الرد بـ [SYNTHESIS]."
           }
           open('/tmp/council-lite-payload.json','w',encoding='utf-8').write(json.dumps(payload,ensure_ascii=False))
           PY
 
           ALIAS_READY=0
           for attempt in 1 2 3 4 5 6 7 8 9 10; do
-            rm -f /tmp/council-lite.ndjson
+            rm -f /tmp/council-lite.txt /tmp/council-lite.headers
             curl --silent --show-error --no-buffer --max-time 59 \
+              --dump-header /tmp/council-lite.headers \
               --request POST "$PUBLIC_PRODUCTION_URL/api/council/run" \
               --header 'content-type: application/json' \
               --data @/tmp/council-lite-payload.json \
-              --output /tmp/council-lite.ndjson || true
+              --output /tmp/council-lite.txt || true
 
-            START_MODEL=$(python - <<'PY'
-          import json
+            ACTIVE_MODEL=$(python - <<'PY'
           model=''
           try:
-            with open('/tmp/council-lite.ndjson',encoding='utf-8') as f:
+            with open('/tmp/council-lite.headers',encoding='utf-8',errors='ignore') as f:
               for raw in f:
-                raw=raw.strip()
-                if not raw: continue
-                item=json.loads(raw)
-                if item.get('type')=='start':
-                  model=str(item.get('model',''))
-                  break
+                if raw.lower().startswith('x-council-model:'):
+                  model=raw.split(':',1)[1].strip()
           except Exception:
             pass
           print(model)
           PY
             )
 
-            echo "production_alias_attempt=$attempt model=${START_MODEL:-none}"
-            if [ "$START_MODEL" = "$EXPECTED_MODEL" ]; then
+            echo "production_alias_attempt=$attempt model=${ACTIVE_MODEL:-none}"
+            if [ "$ACTIVE_MODEL" = "$EXPECTED_MODEL" ]; then
               ALIAS_READY=1
               break
             fi
@@ -154,27 +149,14 @@ jobs:
           done
           test "$ALIAS_READY" = "1"
 
-          cat /tmp/council-lite.ndjson
+          cat /tmp/council-lite.txt
           python - <<'PY'
-          import json
-          events=[]
-          with open('/tmp/council-lite.ndjson',encoding='utf-8') as f:
-            for raw in f:
-              raw=raw.strip()
-              if raw:
-                events.append(json.loads(raw))
-          errors=[e for e in events if e.get('type')=='error']
-          assert not errors, errors
-          for role in ('architect','critic','engineer','judge'):
-            assert any(e.get('type')=='role_start' and e.get('role')==role for e in events), role
-            assert any(e.get('type')=='delta' and e.get('role')==role and str(e.get('text','')).strip() for e in events), role
-            assert any(e.get('type')=='role_done' and e.get('role')==role and str(e.get('text','')).strip() for e in events), role
-          done=next((e for e in events if e.get('type')=='done'),None)
-          assert done, 'missing done event'
-          decision=done['decision']
-          assert decision.get('synthesis','').strip(), decision
-          assert decision.get('status')=='pending_approval', decision
-          assert set(decision.get('responses',{})) == {'architect','critic','engineer','judge'}, decision
-          assert any(e.get('type')=='conflict' for e in events), 'missing streamed conflict event'
-          print('Council Lite production stream E2E PASS')
+          text=open('/tmp/council-lite.txt',encoding='utf-8').read()
+          assert '### Error' not in text, text
+          for role in ('Architect','Critic','Engineer','Judge'):
+            assert f'### {role}' in text, role
+          assert '[CONFLICT]' in text, 'missing conflict marker'
+          assert '[SYNTHESIS]' in text, 'missing synthesis marker'
+          assert len(text.strip()) > 200, 'stream unexpectedly short'
+          print('Council Lite production plain-text stream E2E PASS')
           PY
