@@ -1,0 +1,83 @@
+{
+  "contract": "brain-taxonomy",
+  "version": "1.0.0",
+  "types": {
+    "EVIDENCE": {
+      "definition": "Raw or directly inspectable artifact used to support or challenge a claim.",
+      "examples": ["test output", "scanner report", "commit SHA", "stack trace", "HTTP response", "source lines", "CVE advisory"],
+      "authority": "non_authoritative_raw_material",
+      "requirements": ["provenance", "captured_at", "locator_or_hash"]
+    },
+    "FACT": {
+      "definition": "A neutral, verifiable proposition grounded in evidence, with minimal interpretation.",
+      "example": "Endpoint /users constructs a SQL query using string concatenation with user-controlled input.",
+      "authority": "verified_claim_not_decision",
+      "requirements": ["at_least_one_evidence_link"]
+    },
+    "FINDING": {
+      "definition": "An analytical conclusion derived from evidence and/or facts, such as a defect, vulnerability, regression, or inconsistency.",
+      "example": "Endpoint /users is potentially vulnerable to SQL injection.",
+      "authority": "analysis_not_decision",
+      "requirements": ["supporting_evidence_or_facts", "source_or_analyzer"],
+      "may_trigger": ["security_finding", "review_due", "revalidation"]
+    },
+    "OPINION": {
+      "definition": "A reasoned judgment or preference from a model or human that is not authoritative and may be unsupported by deterministic proof.",
+      "authority": "non_authoritative",
+      "requirements": ["author_or_model", "created_at"]
+    },
+    "PROPOSAL": {
+      "definition": "A concrete recommended action or change offered for review. It is actionable but not authoritative until approved.",
+      "authority": "non_authoritative_action_candidate",
+      "requirements": ["proposer", "target_scope", "rationale"]
+    },
+    "DECISION": {
+      "definition": "An authoritative approved outcome that governs implementation or policy until it is superseded or revoked.",
+      "authority": "authoritative",
+      "requirements": ["decision_schema_valid", "approved_by_authorized_principal", "approval_timestamp"]
+    }
+  },
+  "classification_rules": [
+    {
+      "rule": "scanner_output_is_evidence",
+      "statement": "A security scanner report is EVIDENCE; the conclusion drawn from it is a FINDING."
+    },
+    {
+      "rule": "observation_vs_interpretation",
+      "statement": "If a statement can be checked directly against cited evidence with little judgment, classify it as FACT. If it interprets risk, impact, cause, or severity, classify it as FINDING."
+    },
+    {
+      "rule": "model_output_default",
+      "statement": "Model-generated recommendations default to OPINION or PROPOSAL, never DECISION."
+    },
+    {
+      "rule": "approval_boundary",
+      "statement": "Only an authorized approval event may promote a proposal or draft decision into DECISION."
+    }
+  ],
+  "allowed_relations": [
+    "EVIDENCE_SUPPORTS_FACT",
+    "EVIDENCE_SUPPORTS_FINDING",
+    "EVIDENCE_CONTRADICTS_FACT",
+    "EVIDENCE_CONTRADICTS_FINDING",
+    "FACT_SUPPORTS_FINDING",
+    "FINDING_TRIGGERS_PROPOSAL",
+    "OPINION_INFORMS_PROPOSAL",
+    "PROPOSAL_BECOMES_DECISION_AFTER_APPROVAL",
+    "EVIDENCE_SUPPORTS_DECISION",
+    "EVIDENCE_REVALIDATES_DECISION",
+    "DECISION_SUPERSEDES_DECISION"
+  ],
+  "forbidden_promotions": [
+    "EVIDENCE_DIRECTLY_BECOMES_DECISION_WITHOUT_APPROVAL",
+    "FINDING_DIRECTLY_BECOMES_DECISION_WITHOUT_APPROVAL",
+    "OPINION_DIRECTLY_BECOMES_DECISION_WITHOUT_APPROVAL",
+    "PROPOSAL_SELF_APPROVES"
+  ],
+  "invariants": [
+    "Evidence provenance must be preserved.",
+    "Facts and findings must remain distinguishable in storage and UI.",
+    "A finding may be urgent without becoming authoritative.",
+    "Approved decisions keep historical identity when later superseded or revoked."
+  ]
+}
