@@ -26,46 +26,66 @@ function json(req: Request, body: unknown, status = 200) {
   });
 }
 
+function normalizeKey(raw: string) {
+  let value = raw.trim();
+  value = value.replace(/^MCP_ACCESS_KEY\s*=\s*/i, "").trim();
+  value = value.replace(/^Bearer\s+/i, "").trim();
+  if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+    value = value.slice(1, -1).trim();
+  }
+  return value;
+}
+
 function readDashboardKey(req: Request) {
-  const authorization = (req.headers.get("authorization") || "").trim();
-  const bearer = authorization.toLowerCase().startsWith("bearer ")
-    ? authorization.slice(7).trim()
-    : "";
-  return (
+  const authorization = req.headers.get("authorization") || "";
+  const bearer = /^Bearer\s+/i.test(authorization) ? authorization : "";
+  return normalizeKey(
     req.headers.get("x-brain-key") ||
     req.headers.get("x-amir-key") ||
     bearer ||
-    ""
-  ).trim();
+    "",
+  );
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(req) });
   if (req.method !== "POST") return json(req, { error: "method_not_allowed" }, 405);
 
-  const configuredBrainKey = (Deno.env.get("MCP_ACCESS_KEY") || "").trim();
-  const expectedRunner = (Deno.env.get("COUNCIL_RUNNER_TOKEN") || "").trim();
-  const suppliedRunner = (req.headers.get("x-runner-token") || "").trim();
+  const configuredBrainKey = normalizeKey(Deno.env.get("MCP_ACCESS_KEY") || "");
+  const expectedRunner = normalizeKey(Deno.env.get("COUNCIL_RUNNER_TOKEN") || "");
+  const suppliedRunner = normalizeKey(req.headers.get("x-runner-token") || "");
   const suppliedBrain = readDashboardKey(req);
   const runnerAuthorized = Boolean(expectedRunner) && suppliedRunner === expectedRunner;
 
-  // Dashboard requests are authenticated by the canonical Open Brain MCP itself.
-  // This avoids maintaining two independent comparisons of MCP_ACCESS_KEY.
-  const effectiveBrainKey = runnerAuthorized ? configuredBrainKey : suppliedBrain;
-
-  if (!effectiveBrainKey) {
-    return json(req, {
-      error: "missing_access_key",
-      message: "لم يصل مفتاح الوصول إلى الخادم.",
-    }, 401);
-  }
-
-  if (runnerAuthorized && !configuredBrainKey) {
+  if (!configuredBrainKey) {
     return json(req, {
       error: "mcp_access_key_missing",
       message: "MCP_ACCESS_KEY غير مهيأ على الخادم.",
     }, 500);
   }
+
+  if (!runnerAuthorized) {
+    if (!suppliedBrain) {
+      return json(req, {
+        error: "missing_access_key",
+        message: "لم يصل مفتاح الوصول من الواجهة إلى الخادم.",
+      }, 401);
+    }
+    if (suppliedBrain !== configuredBrainKey) {
+      return json(req, {
+        error: "auth_key_mismatch",
+        message: "المفتاح الذي وصل من الواجهة لا يطابق MCP_ACCESS_KEY الحالي على Supabase.",
+        diagnostics: {
+          supplied_length: suppliedBrain.length,
+          configured_length: configuredBrainKey.length,
+        },
+      }, 401);
+    }
+  }
+
+  // Once the caller is authenticated, always use the canonical server-side key
+  // for the internal MCP hop. This removes browser/header formatting differences.
+  const effectiveBrainKey = configuredBrainKey;
 
   try {
     const body = await req.json().catch(() => ({}));
@@ -85,7 +105,7 @@ Deno.serve(async (req) => {
       requestInit: { headers: { "x-brain-key": effectiveBrainKey } },
     });
 
-    const client = new Client({ name: "amir-council-dashboard-runner", version: "1.4.0" });
+    const client = new Client({ name: "amir-council-dashboard-runner", version: "1.5.0" });
     await client.connect(transport);
     const result = await client.callTool({ name: requestedTool, arguments: requestedArguments }, undefined, {
       timeout: 240_000,
@@ -100,10 +120,10 @@ Deno.serve(async (req) => {
     const unauthorized = /401|unauthorized|forbidden|invalid.*key|access.*key/i.test(message);
     return json(req, {
       ok: false,
-      error: unauthorized ? "unauthorized" : "mcp_call_failed",
+      error: unauthorized ? "mcp_internal_auth_failed" : "mcp_call_failed",
       message: unauthorized
-        ? "المفتاح لم يقبله Open Brain MCP. تأكد أن القيمة هي MCP_ACCESS_KEY الحالية ثم أعد المحاولة."
+        ? "تم قبول مفتاح الواجهة، لكن Open Brain MCP رفض المفتاح الداخلي. أعدنا توحيد المسار على المفتاح المخزن في Supabase؛ إذا استمرت الرسالة فالمشكلة في نسخة MCP المنشورة لا في إدخالك."
         : message,
-    }, unauthorized ? 401 : 500);
+    }, unauthorized ? 502 : 500);
   }
 });
