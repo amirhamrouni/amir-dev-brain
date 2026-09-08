@@ -126,7 +126,7 @@ export function CouncilDashboard() {
             </div>
             <textarea maxLength={900} value={context} onChange={(event) => setContext(event.target.value)} rows={7} />
 
-            <label className="field-label key-label">مفتاح Open Brain للحفظ فقط</label>
+            <label className="field-label key-label">مفتاح اعتماد الذاكرة الدائمة</label>
             <div className="input-shell key-shell">
               <KeyRound size={15} />
               <input
@@ -168,8 +168,8 @@ export function CouncilDashboard() {
           <div className="memory-strip">
             <div className="memory-strip__icon"><BrainCircuit size={16} /></div>
             <div>
-              <strong>Open Brain معزول عن التوليد</strong>
-              <span>يُستخدم فقط بعد الضغط على اعتماد النتيجة</span>
+              <strong>الذاكرة الدائمة معزولة عن التوليد</strong>
+              <span>الاعتماد يحفظ PostgreSQL أولاً ثم يفهرس القرار في Qdrant</span>
             </div>
             <ShieldCheck size={13} />
           </div>
@@ -223,13 +223,7 @@ export function CouncilDashboard() {
           <div className="synthesis-wrap">
             <SynthesisPanel
               synthesis={latestSynthesis}
-              onApprove={
-                decision
-                  ? async () => {
-                      await approveDecision(accessKey);
-                    }
-                  : undefined
-              }
+              onApprove={decision ? () => approveDecision(accessKey) : undefined}
             />
           </div>
 
