@@ -64,6 +64,13 @@ async function runCouncilInBackground({
   runId: string;
   effectiveBrainKey: string;
 }) {
+  // Give the browser a short deterministic window to subscribe to the Realtime channel
+  // after receiving the immediate HTTP acknowledgement. This avoids losing the first
+  // broadcast without holding the request open for the debate itself.
+  if (requestedTool === "amir_council_debate") {
+    await new Promise((resolve) => setTimeout(resolve, 750));
+  }
+
   const requestedArguments = requestedTool === "capture_thought"
     ? { content }
     : { project_slug: projectSlug, question, rounds, run_id: runId };
