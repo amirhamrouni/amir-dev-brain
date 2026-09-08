@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build && rm -rf public && cp -R out public",
+    "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit"
   },
