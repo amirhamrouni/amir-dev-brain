@@ -48,6 +48,20 @@ function readDashboardKey(req: Request) {
   );
 }
 
+function resultText(result: unknown) {
+  const content = (result as { content?: unknown[] } | null)?.content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((item) => {
+      if (!item || typeof item !== "object") return "";
+      const text = (item as { text?: unknown }).text;
+      return typeof text === "string" ? text : "";
+    })
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+}
+
 const realtimeAdmin = createClient(
   Deno.env.get("SUPABASE_URL") || `https://${PROJECT_REF}.supabase.co`,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
@@ -84,8 +98,8 @@ async function runCouncilInBackground({
   effectiveBrainKey: string;
 }) {
   if (requestedTool === "amir_council_debate") {
-    await new Promise((resolve) => setTimeout(resolve, 750));
-    await runnerBroadcast(runId, "status", { status: "worker_started" });
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await runnerBroadcast(runId, "status", { status: "started" });
   }
 
   const requestedArguments = requestedTool === "capture_thought"
@@ -96,25 +110,49 @@ async function runCouncilInBackground({
     requestInit: { headers: { "x-brain-key": effectiveBrainKey } },
   });
 
-  const client = new Client({ name: "amir-council-dashboard-runner", version: "1.7.0" });
+  const client = new Client({ name: "amir-council-dashboard-runner", version: "1.8.0" });
   try {
     await client.connect(transport);
     const result = await client.callTool({ name: requestedTool, arguments: requestedArguments }, undefined, {
-      timeout: 115_000,
-      maxTotalTimeout: 115_000,
+      timeout: 105_000,
+      maxTotalTimeout: 105_000,
     });
+
     if ((result as any)?.isError) {
       const detail = JSON.stringify(result).slice(0, 1800);
       console.error("council_background_tool_error", { runId, requestedTool, detail });
       if (requestedTool === "amir_council_debate") {
-        await runnerBroadcast(runId, "error", { status: "error", message: "Council MCP returned an error.", detail });
+        await runnerBroadcast(runId, "error", {
+          status: "error",
+          message: "المجلس أعاد خطأ من محرك MCP.",
+          detail,
+        });
       }
+      return;
+    }
+
+    if (requestedTool === "amir_council_debate") {
+      const text = resultText(result);
+      if (!text) {
+        await runnerBroadcast(runId, "error", {
+          status: "error",
+          message: "اكتمل المجلس دون نص نتيجة قابل للعرض.",
+        });
+        return;
+      }
+      await runnerBroadcast(runId, "transcript", { text });
+      await runnerBroadcast(runId, "done", { status: "completed" });
     }
   } catch (error) {
     const message = String((error as Error)?.message || error);
     console.error("council_background_failed", { runId, requestedTool, message });
     if (requestedTool === "amir_council_debate") {
-      await runnerBroadcast(runId, "error", { status: "error", message });
+      await runnerBroadcast(runId, "error", {
+        status: "error",
+        message: /timeout|timed out|deadline|resource/i.test(message)
+          ? "تجاوز تنفيذ المجلس حد وقت Supabase. شغّل جولة واحدة وأعد المحاولة."
+          : message,
+      });
     }
   } finally {
     await client.close().catch(() => undefined);
@@ -151,7 +189,8 @@ Deno.serve(async (req) => {
   const body = await req.json().catch(() => ({}));
   const projectSlug = String(body.project_slug || "amir-dev-brain");
   const question = String(body.question || "v1-architecture-and-pipeline");
-  const rounds = Number.isInteger(body.rounds) ? Math.min(3, Math.max(1, body.rounds)) : 1;
+  const requestedRounds = Number.isInteger(body.rounds) ? Math.min(3, Math.max(1, body.rounds)) : 1;
+  const rounds = 1;
   const requestedTool: "capture_thought" | "amir_council_debate" = body.tool_name === "capture_thought" ? "capture_thought" : "amir_council_debate";
   const content = String(body.content || "");
   const runId = String(body.run_id || crypto.randomUUID()).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 96) || crypto.randomUUID();
@@ -165,10 +204,16 @@ Deno.serve(async (req) => {
     return json(req, { ok: false, error: "realtime_anon_key_missing", message: "SUPABASE_ANON_KEY غير متاح للـ Realtime handoff." }, 500);
   }
 
-  const background = runCouncilInBackground({ projectSlug, question, rounds, requestedTool, content, runId, effectiveBrainKey: configuredBrainKey });
+  const background = runCouncilInBackground({
+    projectSlug,
+    question,
+    rounds,
+    requestedTool,
+    content,
+    runId,
+    effectiveBrainKey: configuredBrainKey,
+  });
 
-  // Supabase's supported background-task boundary. The request returns now; the promise
-  // is kept alive by the Edge Runtime, subject to the platform's hard wall-clock limit.
   EdgeRuntime.waitUntil(background);
 
   return json(req, {
@@ -180,5 +225,9 @@ Deno.serve(async (req) => {
       url: `https://${PROJECT_REF}.supabase.co`,
       anon_key: realtimeAnonKey,
     } : null,
+    execution: {
+      requested_rounds: requestedRounds,
+      executed_rounds: requestedTool === "amir_council_debate" ? rounds : undefined,
+    },
   }, 200);
 });
