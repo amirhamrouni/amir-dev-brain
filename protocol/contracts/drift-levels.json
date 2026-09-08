@@ -1,0 +1,90 @@
+{
+  "contract": "drift-levels",
+  "version": "1.0.0",
+  "principle": "A version or environment change does not automatically invalidate a decision. It may invalidate or stale the evidence that supported the decision and therefore trigger revalidation.",
+  "levels": {
+    "SYNCED": {
+      "severity": 0,
+      "meaning": "No material drift detected in bound dependencies, tools, policies, implementation assumptions, environment, or evidence.",
+      "decision_effect": "none",
+      "evidence_effect": "remain_valid",
+      "required_action": "none"
+    },
+    "MINOR_DRIFT": {
+      "severity": 1,
+      "meaning": "A relevant change occurred, but no known decision assumption or critical evidence has been invalidated.",
+      "examples": [
+        "compatible patch or minor dependency change",
+        "non-semantic workflow update",
+        "tool version change within an explicitly accepted compatibility range"
+      ],
+      "decision_effect": "decision_remains_active",
+      "evidence_effect": "affected_evidence_may_be_potentially_stale",
+      "required_action": "targeted_revalidation",
+      "auto_merge_allowed": true
+    },
+    "SIGNIFICANT_DRIFT": {
+      "severity": 2,
+      "meaning": "A material assumption, policy, security posture, implementation boundary, or critical evidence basis may no longer hold.",
+      "examples": [
+        "major tool or dependency change outside the accepted range",
+        "new security finding affecting the decision scope",
+        "policy change touching an authoritative constraint",
+        "critical supporting evidence becomes invalid",
+        "implementation changes so the original evidence no longer describes the deployed system"
+      ],
+      "decision_effect": "mark_review_due_or_evidence_stale_and_revalidate",
+      "evidence_effect": "mark_affected_evidence_stale_or_revalidating",
+      "required_action": "owner_visible_revalidation",
+      "auto_merge_allowed": false
+    }
+  },
+  "evaluation_rules": [
+    {
+      "id": "DRIFT-SECURITY",
+      "when": "a new security finding materially affects decision scope",
+      "level": "SIGNIFICANT_DRIFT"
+    },
+    {
+      "id": "DRIFT-POLICY",
+      "when": "a bound policy changes semantically",
+      "level": "SIGNIFICANT_DRIFT"
+    },
+    {
+      "id": "DRIFT-MAJOR",
+      "when": "a bound component changes major version or exits its declared version constraint",
+      "level": "SIGNIFICANT_DRIFT"
+    },
+    {
+      "id": "DRIFT-EVIDENCE",
+      "when": "critical supporting evidence is invalidated or no longer matches the implementation",
+      "level": "SIGNIFICANT_DRIFT"
+    },
+    {
+      "id": "DRIFT-MINOR",
+      "when": "a bound component changes without violating a constraint and without invalidating critical evidence",
+      "level": "MINOR_DRIFT"
+    },
+    {
+      "id": "DRIFT-NONE",
+      "when": "no relevant bound context changed",
+      "level": "SYNCED"
+    }
+  ],
+  "precedence": [
+    "SIGNIFICANT_DRIFT",
+    "MINOR_DRIFT",
+    "SYNCED"
+  ],
+  "state_mapping": {
+    "SYNCED": ["ACTIVE"],
+    "MINOR_DRIFT": ["ACTIVE", "REVALIDATING"],
+    "SIGNIFICANT_DRIFT": ["REVIEW_DUE", "EVIDENCE_STALE", "REVALIDATING"]
+  },
+  "invariants": [
+    "Drift detection must identify which binding or evidence edge triggered the result.",
+    "A watchdog may mark evidence stale but may not revoke or supersede the decision by itself.",
+    "SIGNIFICANT_DRIFT blocks deterministic auto-merge until revalidation resolves it.",
+    "Drift history must be append-only or otherwise auditable."
+  ]
+}
