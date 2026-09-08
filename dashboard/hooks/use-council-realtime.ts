@@ -19,7 +19,7 @@ function firstParagraph(text: string) {
 
 function parseCouncilTranscript(text: string): CouncilEvent[] {
   const cleaned = text.replace(/\nSaved to Open Brain thought:[\s\S]*$/i, "").trim();
-  const matches = [...cleaned.matchAll(/^##\s+(Gemini Round \d+|OpenAI Round \d+|Council Synthesis)(?:\s+\(([^)]+)\))?\s*$/gmi)];
+  const matches = [...cleaned.matchAll(/^##\s+(Architecture Round \d+|Engineering Round \d+|Gemini Round \d+|OpenAI Round \d+|Council Synthesis)(?:\s+\(([^)]+)\))?\s*$/gmi)];
   const now = () => new Date().toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit" });
   const events: CouncilEvent[] = [];
 
@@ -43,12 +43,12 @@ function parseCouncilTranscript(text: string): CouncilEvent[] {
       return;
     }
 
-    const isGemini = /^Gemini/i.test(title);
+    const isArchitecture = /^(Architecture|Gemini)/i.test(title);
     const round = title.match(/(\d+)/)?.[1] || String(index + 1);
     const message: CouncilMessage = {
       id: `council-${crypto.randomUUID()}`,
-      modelLabel: isGemini ? "نموذج جيميني" : "نموذج OpenAI",
-      tone: isGemini ? "blue" : "red",
+      modelLabel: isArchitecture ? "جانب المعمارية" : "جانب الهندسة والتنفيذ",
+      tone: isArchitecture ? "blue" : "red",
       title: `الجولة ${round}${provider ? ` · ${provider}` : ""}`,
       content: body,
       timestamp: now(),
@@ -88,9 +88,7 @@ function parseCouncilTranscript(text: string): CouncilEvent[] {
 function friendlyCouncilError(status: number, raw: unknown) {
   const message = typeof raw === "string" ? raw : "";
   if (status === 401 || /unauthorized|auth_key_mismatch/i.test(message)) {
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem("amir_mcp_access_key");
-    }
+    if (typeof window !== "undefined") window.localStorage.removeItem("amir_mcp_access_key");
     return "مفتاح الوصول المحفوظ قديم أو غير مطابق. تم مسحه من هذا الجهاز. أدخل MCP_ACCESS_KEY الحالي ثم أعد المحاولة.";
   }
   if (/MCP_ACCESS_KEY missing/i.test(message)) {
@@ -123,19 +121,13 @@ export function useCouncilRealtime() {
     setState("running");
     setError(null);
     setEvents([]);
-
     const runId = crypto.randomUUID();
 
     try {
-      // This fetch is only an enqueue/auth handshake. It must return immediately and
-      // never wait for model generation. All debate output arrives via Realtime below.
       const response = await fetch(COUNCIL_API, {
         method: "POST",
         cache: "no-store",
-        headers: {
-          "content-type": "application/json",
-          "x-amir-key": normalizedKey,
-        },
+        headers: { "content-type": "application/json", "x-amir-key": normalizedKey },
         body: JSON.stringify({ project_slug: project.trim() || "amir-dev-brain", question, rounds, run_id: runId }),
       });
       const data = await response.json().catch(() => ({}));
@@ -160,8 +152,7 @@ export function useCouncilRealtime() {
 
       channel
         .on("broadcast", { event: "status" }, ({ payload }) => {
-          if (payload?.run_id !== runId) return;
-          if (payload?.status === "started") setState("running");
+          if (payload?.run_id === runId && payload?.status === "started") setState("running");
         })
         .on("broadcast", { event: "transcript" }, ({ payload }) => {
           if (payload?.run_id !== runId || typeof payload?.text !== "string") return;
@@ -178,18 +169,12 @@ export function useCouncilRealtime() {
           failRealtime(String(payload?.message || "تعذّر إكمال نقاش المجلس."));
         });
 
-      const timer = setTimeout(() => {
-        failRealtime("انتهت مهلة انتظار Realtime دون حدث ختامي من المجلس.");
-      }, MAX_REALTIME_WAIT_MS);
+      const timer = setTimeout(() => failRealtime("انتهت مهلة انتظار Realtime دون حدث ختامي من المجلس."), MAX_REALTIME_WAIT_MS);
       activeRef.current = { client, channel, timer };
-
       channel.subscribe((status) => {
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          failRealtime("تعذّر فتح قناة Supabase Realtime للمجلس.");
-        }
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") failRealtime("تعذّر فتح قناة Supabase Realtime للمجلس.");
       });
 
-      // Fire-and-forget from the UI perspective: debate generation is no longer awaited.
       return [] as CouncilEvent[];
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
