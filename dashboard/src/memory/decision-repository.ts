@@ -113,7 +113,7 @@ async function getEvidenceLinksByDecisionIds(ids: string[]) {
       from public.decision_evidence de
       join public.evidence e on e.id = de.evidence_id
       where de.decision_id = any($1::text[])
-      order by de.created_at asc
+      order by de.evidence_id asc
     `,
     [ids],
   );
