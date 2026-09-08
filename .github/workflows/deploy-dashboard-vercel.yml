@@ -104,7 +104,7 @@ jobs:
 
       - name: Smoke test live Council Lite stream
         env:
-          DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
+          PUBLIC_PRODUCTION_URL: https://amir-brain-console.vercel.app
         shell: bash
         run: |
           set -euo pipefail
@@ -118,7 +118,7 @@ jobs:
           PY
 
           curl --fail-with-body --silent --show-error --no-buffer --max-time 59 \
-            --request POST "$DEPLOYMENT_URL/api/council/run" \
+            --request POST "$PUBLIC_PRODUCTION_URL/api/council/run" \
             --header 'content-type: application/json' \
             --data @/tmp/council-lite-payload.json \
             --output /tmp/council-lite.ndjson
