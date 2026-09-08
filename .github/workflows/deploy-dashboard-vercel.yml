@@ -22,6 +22,8 @@ jobs:
       VERCEL_ORG_ID: team_UKAtfO6HzAtWy9WQ5YuXlPLC
       VERCEL_PROJECT_ID: prj_jFc0iqPP0ofyCATBibwmGQbpLMjZ
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_MODEL: gemini-2.5-flash
       VERCEL_CLI_VERSION: 59.11.7
       VERCEL_TELEMETRY_DISABLED: 1
       CI: 1
@@ -29,10 +31,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: Require Vercel token
+      - name: Require deployment secrets
         run: |
+          set -euo pipefail
           if [ -z "$VERCEL_TOKEN" ]; then
             echo "VERCEL_TOKEN GitHub secret is required." >&2
+            exit 1
+          fi
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "GEMINI_API_KEY GitHub secret is required for Council Lite." >&2
             exit 1
           fi
 
@@ -58,5 +65,66 @@ jobs:
       - name: Build production dashboard
         run: npx --yes "vercel@${VERCEL_CLI_VERSION}" build --prod --scope=amirhamrounis-projects --token="$VERCEL_TOKEN"
 
-      - name: Deploy production dashboard
-        run: npx --yes "vercel@${VERCEL_CLI_VERSION}" deploy --prebuilt --prod --scope=amirhamrounis-projects --token="$VERCEL_TOKEN"
+      - name: Deploy production dashboard with Council Lite runtime env
+        id: deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes "vercel@${VERCEL_CLI_VERSION}" deploy \
+            --prebuilt \
+            --prod \
+            --scope=amirhamrounis-projects \
+            --token="$VERCEL_TOKEN" \
+            --env GEMINI_API_KEY="$GEMINI_API_KEY" \
+            --env GEMINI_MODEL="$GEMINI_MODEL" \
+            > deployment-url.txt
+          cat deployment-url.txt
+          DEPLOYMENT_URL="$(tail -n 1 deployment-url.txt | tr -d '\r')"
+          test -n "$DEPLOYMENT_URL"
+          echo "url=$DEPLOYMENT_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test live Council Lite stream
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          payload = {
+            "project": "amir-dev-brain",
+            "question": "اختبار إنتاج Council Lite فقط: اجعل كل دور مختصراً جداً في نقطتين كحد أقصى، وتأكد أن Critic يضع [CONFLICT_FLAG] لاعتراض واحد حقيقي."
+          }
+          open('/tmp/council-lite-payload.json','w',encoding='utf-8').write(json.dumps(payload,ensure_ascii=False))
+          PY
+
+          curl --fail-with-body --silent --show-error --no-buffer --max-time 59 \
+            --request POST "$DEPLOYMENT_URL/api/council/run" \
+            --header 'content-type: application/json' \
+            --data @/tmp/council-lite-payload.json \
+            --output /tmp/council-lite.ndjson
+
+          cat /tmp/council-lite.ndjson
+          python - <<'PY'
+          import json
+          events=[]
+          with open('/tmp/council-lite.ndjson',encoding='utf-8') as f:
+            for raw in f:
+              raw=raw.strip()
+              if raw:
+                events.append(json.loads(raw))
+          errors=[e for e in events if e.get('type')=='error']
+          assert not errors, errors
+          for role in ('architect','critic','engineer','judge'):
+            assert any(e.get('type')=='role_start' and e.get('role')==role for e in events), role
+            assert any(e.get('type')=='delta' and e.get('role')==role and str(e.get('text','')).strip() for e in events), role
+            assert any(e.get('type')=='role_done' and e.get('role')==role and str(e.get('text','')).strip() for e in events), role
+          done=next((e for e in events if e.get('type')=='done'),None)
+          assert done, 'missing done event'
+          decision=done['decision']
+          assert decision.get('synthesis','').strip(), decision
+          assert decision.get('status')=='pending_approval', decision
+          assert set(decision.get('responses',{})) == {'architect','critic','engineer','judge'}, decision
+          assert any(e.get('type')=='conflict' for e in events), 'missing streamed conflict event'
+          print('Council Lite production stream E2E PASS')
+          PY
