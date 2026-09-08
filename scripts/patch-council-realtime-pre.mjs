@@ -9,11 +9,11 @@ if (!src.includes(registerMarker)) throw new Error('Council register marker not 
 const helper = String.raw`
   async function councilRealtimeBroadcast(runId: string, event: string, payload: Record<string, unknown>) {
     if (!runId) return;
-    const channel = supabase.channel("council:" + runId, {
-      config: { broadcast: { ack: true } },
-    });
+    const channel = supabase.channel("council:" + runId);
     try {
-      await channel.send({ type: "broadcast", event, payload: { run_id: runId, ...payload } });
+      // Server-side broadcasts must not depend on a WebSocket subscription owned by
+      // this Edge Function. httpSend always uses Supabase's REST broadcast endpoint.
+      await channel.httpSend(event, { run_id: runId, ...payload });
     } catch (error) {
       console.warn("Council Realtime broadcast failed", event, String((error as Error)?.message || error));
     } finally {
@@ -55,4 +55,4 @@ if (!src.includes(doneMarker)) throw new Error('Council completion marker not fo
 src = src.replace(doneMarker, '        const thoughtId = await saveCouncilThought(record, safe);\n        await councilRealtimeBroadcast(councilRunId, "done", { status: "completed", thought_id: thoughtId });\n        return { content: [{ type: "text" as const, text: record + "\\n\\nSaved to Open Brain thought: " + thoughtId }] };');
 
 fs.writeFileSync(target, src);
-console.log('Patched council transcript with Supabase Realtime broadcasts');
+console.log('Patched council transcript with REST-backed Supabase Realtime broadcasts');
