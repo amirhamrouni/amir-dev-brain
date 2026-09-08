@@ -155,6 +155,7 @@ export function useCouncilLite() {
           throw new Error(data.error || `Council Lite HTTP ${response.status}`);
         }
 
+        const modelName = response.headers.get("x-council-model") || undefined;
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let fullText = "";
@@ -197,7 +198,7 @@ export function useCouncilLite() {
           timestamp: new Date().toISOString(),
           status: "pending_approval",
           council_version: "lite-v1",
-          model: "gemini-1.5-flash",
+          model: modelName,
         };
 
         setDecision(nextDecision);
