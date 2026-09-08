@@ -88,48 +88,23 @@ jobs:
       - name: Build production dashboard
         run: npx --yes "vercel@${VERCEL_CLI_VERSION}" build --prod --scope=amirhamrounis-projects --token="$VERCEL_TOKEN"
 
-      - name: Deploy production dashboard with effective Vercel runtime env
+      - name: Deploy production dashboard from source
         id: deploy
         shell: bash
         run: |
           set -euo pipefail
-          npx --yes "vercel@${VERCEL_CLI_VERSION}" env run \
-            --environment=production \
-            --scope=amirhamrounis-projects \
-            --token="$VERCEL_TOKEN" \
-            -- bash -eu -o pipefail -c '
-              : "${DATABASE_URL:?DATABASE_URL missing from Vercel production env}"
-              : "${QDRANT_URL:?QDRANT_URL missing from Vercel production env}"
-              : "${QDRANT_API_KEY:?QDRANT_API_KEY missing from Vercel production env}"
-
-              DEPLOY_ARGS=(
-                --prebuilt
-                --prod
-                --scope=amirhamrounis-projects
-                --token="$VERCEL_TOKEN"
-                --env DATABASE_URL="$DATABASE_URL"
-                --env QDRANT_URL="$QDRANT_URL"
-                --env QDRANT_API_KEY="$QDRANT_API_KEY"
-              )
-
-              if [ -n "${GEMINI_API_KEY:-}" ]; then
-                DEPLOY_ARGS+=(--env GEMINI_API_KEY="$GEMINI_API_KEY")
-              fi
-              if [ -n "${GEMINI_MODEL:-}" ]; then
-                DEPLOY_ARGS+=(--env GEMINI_MODEL="$GEMINI_MODEL")
-              fi
-              if [ -n "${OPENAI_API_KEY:-}" ]; then
-                DEPLOY_ARGS+=(--env OPENAI_API_KEY="$OPENAI_API_KEY")
-              fi
-              if [ -n "${EMBEDDING_MODEL:-}" ]; then
-                DEPLOY_ARGS+=(--env EMBEDDING_MODEL="$EMBEDDING_MODEL")
-              fi
-              if [ -n "${QDRANT_VECTOR_SIZE:-}" ]; then
-                DEPLOY_ARGS+=(--env QDRANT_VECTOR_SIZE="$QDRANT_VECTOR_SIZE")
-              fi
-
-              npx --yes "vercel@${VERCEL_CLI_VERSION}" deploy "${DEPLOY_ARGS[@]}"
-            ' > deployment-url.txt
+          DEPLOY_ARGS=(
+            --prod
+            --yes
+            --scope=amirhamrounis-projects
+            --token="$VERCEL_TOKEN"
+            --env GEMINI_API_KEY="$GEMINI_API_KEY"
+            --env GEMINI_MODEL="$GEMINI_MODEL"
+          )
+          if [ -n "$OPENAI_API_KEY" ]; then
+            DEPLOY_ARGS+=(--env OPENAI_API_KEY="$OPENAI_API_KEY")
+          fi
+          npx --yes "vercel@${VERCEL_CLI_VERSION}" deploy "${DEPLOY_ARGS[@]}" > deployment-url.txt
           cat deployment-url.txt
           DEPLOYMENT_URL="$(tail -n 1 deployment-url.txt | tr -d '\r')"
           test -n "$DEPLOYMENT_URL"
