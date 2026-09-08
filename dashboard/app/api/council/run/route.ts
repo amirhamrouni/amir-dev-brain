@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
-const MODEL = "gemini-1.5-flash";
+const MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-1.5-flash";
 const SEPARATOR = "════════════════════════════════";
 
 type RoleId = "Architect" | "Critic" | "Engineer" | "Judge";
