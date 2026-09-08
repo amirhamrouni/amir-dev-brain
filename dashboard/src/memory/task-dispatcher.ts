@@ -134,9 +134,13 @@ function normalizedDecisionForHash(decision: Decision) {
   };
 }
 
+export function decisionSnapshotSha256(decision: Decision) {
+  return sha256(normalizedDecisionForHash(decision));
+}
+
 function validateBaseRef(value: string) {
-  const normalized = value.trim();
-  if (!normalized || normalized.length > 200 || /[\u0000-\u001f\u007f]/.test(normalized)) {
+  const normalized = value.trim().toLowerCase();
+  if (!/^[0-9a-f]{40}$/.test(normalized)) {
     throw new Error("invalid_base_ref");
   }
   return normalized;
@@ -171,7 +175,7 @@ export async function dispatchImplementationTask(
   // V1 decisions currently have no immutable revision table. Revision 1 therefore
   // means "the authoritative decision snapshot hashed at dispatch time".
   const decisionRevision = 1;
-  const decisionSha256 = sha256(normalizedDecisionForHash(decision));
+  const decisionSha256 = decisionSnapshotSha256(decision);
   const idempotencyKey = `adb:${sha256({
     decision_id: decisionId,
     decision_revision: decisionRevision,
