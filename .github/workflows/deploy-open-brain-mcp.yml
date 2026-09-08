@@ -116,6 +116,7 @@ jobs:
           grep -q 'OPENROUTER_API_KEYS' supabase/functions/open-brain-mcp/index.ts
           grep -q 'GOOGLE_AI_STUDIO_API_KEYS' supabase/functions/open-brain-mcp/index.ts
           grep -q 'x-goog-api-key' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'AbortSignal.timeout(12000)' supabase/functions/open-brain-mcp/index.ts
           grep -q 'st004FailFastDecision' supabase/functions/open-brain-mcp/index.ts
           grep -q 'pending_action' supabase/functions/open-brain-mcp/index.ts
           grep -q 'superseded_by' supabase/functions/open-brain-mcp/index.ts
@@ -125,16 +126,23 @@ jobs:
           grep -q 'st004ReadCachedMetadata' supabase/functions/open-brain-mcp/index.ts
           grep -q 'st004WriteCachedMetadata' supabase/functions/open-brain-mcp/index.ts
           grep -q '\[CONFLICT_FLAG topics=' supabase/functions/open-brain-mcp/index.ts
-          grep -q 'nvidia/nemotron-3-ultra-550b-a55b:free' supabase/functions/open-brain-mcp/index.ts
-          grep -q 'minimax/minimax-m3:free' supabase/functions/open-brain-mcp/index.ts
           grep -q 'openrouter/free' supabase/functions/open-brain-mcp/index.ts
-          grep -q 'max_tokens: 1800' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'max_tokens: 700' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'maxOutputTokens: 900' supabase/functions/open-brain-mcp/index.ts
           if grep -q 'google/gemini-2.0-flash-exp:free' supabase/functions/open-brain-mcp/index.ts; then
             echo 'Stale Gemini free council model remains in generated server'
             exit 1
           fi
           if grep -q 'qwen/qwen-2.5-coder-32b-instruct:free' supabase/functions/open-brain-mcp/index.ts; then
             echo 'Stale Qwen free council model remains in generated server'
+            exit 1
+          fi
+          if grep -q 'nvidia/nemotron-3-ultra-550b-a55b:free' supabase/functions/open-brain-mcp/index.ts; then
+            echo 'Slow pinned free model remains in generated server'
+            exit 1
+          fi
+          if grep -q 'minimax/minimax-m3:free' supabase/functions/open-brain-mcp/index.ts; then
+            echo 'Slow pinned free model remains in generated server'
             exit 1
           fi
           if grep -q 'openai/gpt-5.6-luna-pro' supabase/functions/open-brain-mcp/index.ts; then
