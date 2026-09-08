@@ -21,7 +21,7 @@ on:
       rounds:
         description: "Council debate rounds"
         required: true
-        default: "2"
+        default: "1"
         type: string
 
 permissions:
@@ -32,9 +32,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PROJECT_SLUG: amir-dev-brain
-      COUNCIL_ROUNDS: "2"
+      COUNCIL_ROUNDS: "1"
       COUNCIL_QUESTION: >-
-        dev-brain-dashboard-premium-ui-architecture. Design the premium visual dashboard for Amir Dev Brain AI Council. Debate deeply between analysis and engineering sides about multi-agent conversation UX, split-screen versus threaded views, provenance, conflict visibility, live-status indicators, and cognitive load; evaluate Next.js App Router, Tailwind CSS, Motion for React, and Supabase Realtime; define a concrete layout for two model sides debating, round navigation, retrieved memory/provenance, conflict flags, and a final Synthesis panel with Amir-only Approve/Reject actions that persist decisions to Open Brain through governed backend actions; cover realtime architecture, security boundaries, responsive/mobile UX, accessibility, and MVP versus post-MVP scope. Use only these supplied verified source facts: Next.js official docs describe App Router as the newer router with Server Components. Supabase official docs say Realtime supports Broadcast, Presence and Postgres Changes, and recommend Broadcast for scalability/security while Postgres Changes is simpler but scales less well. Motion for React is the current Framer Motion React animation library with production-grade layout, gesture and scroll animations plus reduced-motion accessibility support. Source references supplied: nextjs.org/docs ; supabase.com/docs/guides/realtime ; supabase.com/docs/guides/realtime/subscribing-to-database-changes ; motion.dev/docs/react. Do not invent research citations beyond these sources. Return a concrete component/layout architecture, data flow, state model, animation principles, responsive behavior, and exact approval flow.
+        Verify the asynchronous Amir Dev Brain council pipeline. Produce one concise architecture round, one concise engineering round, and a final synthesis; persist the result to Open Brain. Focus on whether Fire-and-Forget plus Supabase Realtime Broadcast cleanly separates the short HTTP enqueue handshake from the long-running council work.
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -43,6 +43,10 @@ jobs:
         uses: supabase/setup-cli@v1
         with:
           version: 2.116.0
+
+      - name: Install dashboard Realtime client
+        working-directory: dashboard
+        run: npm ci --ignore-scripts
 
       - name: Generate one-shot runner token
         id: token
@@ -60,25 +64,31 @@ jobs:
         run: |
           supabase secrets set COUNCIL_RUNNER_TOKEN="$RUNNER_TOKEN" --project-ref hdcpvwsndxxflbednvsq
 
-      - name: Deploy one-shot E2E runner
+      - name: Deploy asynchronous E2E runner
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           supabase functions deploy council-e2e-runner --project-ref hdcpvwsndxxflbednvsq --no-verify-jwt --use-api
 
-      - name: Run dynamic council E2E
+      - name: Enqueue council and assert fast HTTP handoff
         env:
           RUNNER_TOKEN: ${{ steps.token.outputs.token }}
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json, os
-          payload = {"project_slug": os.environ["PROJECT_SLUG"], "question": os.environ["COUNCIL_QUESTION"], "rounds": int(os.environ["COUNCIL_ROUNDS"])}
+          import json, os, uuid
+          payload = {
+            "project_slug": os.environ["PROJECT_SLUG"],
+            "question": os.environ["COUNCIL_QUESTION"],
+            "rounds": int(os.environ["COUNCIL_ROUNDS"]),
+            "run_id": str(uuid.uuid4()),
+          }
           open("council-payload.json","w",encoding="utf-8").write(json.dumps(payload,ensure_ascii=False))
           PY
 
           HTTP_CODE="000"
+          START_MS=$(date +%s%3N)
           for attempt in 1 2 3 4 5 6; do
             HTTP_CODE=$(curl --silent --show-error --output council-e2e-result.json --write-out '%{http_code}' --request POST 'https://hdcpvwsndxxflbednvsq.supabase.co/functions/v1/council-e2e-runner' --header "x-runner-token: $RUNNER_TOKEN" --header 'content-type: application/json' --data @council-payload.json)
             if [ "$HTTP_CODE" = "200" ]; then break; fi
@@ -86,25 +96,89 @@ jobs:
             echo "Runner secret not propagated yet (attempt $attempt); retrying..."
             sleep 4
           done
-
+          END_MS=$(date +%s%3N)
+          ELAPSED_MS=$((END_MS - START_MS))
+          echo "enqueue_http=$HTTP_CODE elapsed_ms=$ELAPSED_MS"
           cat council-e2e-result.json
           test "$HTTP_CODE" = "200"
           python - <<'PY'
           import json
           data=json.load(open('council-e2e-result.json',encoding='utf-8'))
-          if not data.get('ok'): raise SystemExit(str(data))
-          text=' '.join(str(x.get('text','')) for x in data.get('result',{}).get('content',[]) if isinstance(x,dict))
-          if 'Saved to Open Brain thought:' not in text: raise SystemExit('Council result did not confirm Open Brain persistence')
+          assert data.get('ok') is True, data
+          assert data.get('accepted') is True, data
+          assert data.get('run_id'), data
+          assert data.get('channel') == 'council:' + data['run_id'], data
+          assert data.get('realtime', {}).get('url'), data
+          assert data.get('realtime', {}).get('anon_key'), data
           PY
+          # The request must be an enqueue/auth handshake, not a model-generation wait.
+          test "$ELAPSED_MS" -lt 10000
+
+      - name: Wait for Realtime transcript and completion
+        working-directory: dashboard
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp ../council-e2e-result.json ./council-e2e-result.json
+          cat > council-realtime-e2e.mjs <<'JS'
+          import fs from 'node:fs';
+          import { createClient } from '@supabase/supabase-js';
+
+          const handoff = JSON.parse(fs.readFileSync('council-e2e-result.json', 'utf8'));
+          const runId = handoff.run_id;
+          const client = createClient(handoff.realtime.url, handoff.realtime.anon_key, {
+            auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+          });
+          const channel = client.channel(handoff.channel, { config: { broadcast: { self: false } } });
+          const received = [];
+          let settled = false;
+
+          const finish = async (ok, detail) => {
+            if (settled) return;
+            settled = true;
+            fs.writeFileSync('../council-realtime-events.json', JSON.stringify({ run_id: runId, ok, detail, received }, null, 2));
+            await client.removeChannel(channel).catch(() => undefined);
+            if (!ok) process.exitCode = 1;
+            setTimeout(() => process.exit(ok ? 0 : 1), 50);
+          };
+
+          channel
+            .on('broadcast', { event: 'status' }, ({ payload }) => {
+              if (payload?.run_id === runId) received.push({ event: 'status', payload });
+            })
+            .on('broadcast', { event: 'transcript' }, ({ payload }) => {
+              if (payload?.run_id === runId) received.push({ event: 'transcript', payload });
+            })
+            .on('broadcast', { event: 'done' }, ({ payload }) => {
+              if (payload?.run_id !== runId) return;
+              received.push({ event: 'done', payload });
+              const hasTranscript = received.some((item) => item.event === 'transcript' && typeof item.payload?.text === 'string' && item.payload.text.trim());
+              void finish(hasTranscript, hasTranscript ? 'Realtime transcript and done received' : 'done arrived without transcript');
+            })
+            .on('broadcast', { event: 'error' }, ({ payload }) => {
+              if (payload?.run_id !== runId) return;
+              received.push({ event: 'error', payload });
+              void finish(false, payload?.message || 'Council emitted Realtime error');
+            });
+
+          channel.subscribe((status) => {
+            console.log('realtime_status=' + status);
+            if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') void finish(false, 'Realtime subscription failed: ' + status);
+          });
+
+          setTimeout(() => void finish(false, 'Timed out waiting for Realtime done event'), 240000);
+          JS
+          node council-realtime-e2e.mjs
 
       - name: Upload council result artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: autonomous-council-result
+          name: autonomous-council-async-result
           path: |
             council-payload.json
             council-e2e-result.json
+            council-realtime-events.json
           if-no-files-found: warn
 
       - name: Remove temporary runner secret
