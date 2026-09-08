@@ -44,7 +44,7 @@ jobs:
             exit 1
           fi
           if [ -z "$OPENAI_API_KEY" ]; then
-            echo "OPENAI_API_KEY is not configured yet; deploy will proceed with Engineer seat gated until the key is added."
+            echo "OPENAI_API_KEY is not present in GitHub Actions; the production smoke test will detect whether Vercel already provides it."
           fi
 
       - name: Setup Node
@@ -113,49 +113,35 @@ jobs:
       - name: Smoke test live Council v1.5 stream
         env:
           PUBLIC_PRODUCTION_URL: https://amir-brain-console.vercel.app
-          EXPECTED_MODEL: gemini-3.5-flash-lite
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
           import json
           payload = {
-            "userQuery": "اختبار إنتاج Council v1.5 فقط: اجعل كل دور مختصراً، وعلى Critic وضع [CONFLICT] لاعتراض حقيقي، وعلى Judge إنهاء الرد بـ [SYNTHESIS]."
+            "userQuery": "اختبار إنتاج Council v1.5: أجب كل دور بإيجاز شديد. على Critic تضمين [CONFLICT] وعلى Judge إنهاء القرار بـ [SYNTHESIS]."
           }
           open('/tmp/council-v15-payload.json','w',encoding='utf-8').write(json.dumps(payload,ensure_ascii=False))
           PY
 
-          if [ -z "$OPENAI_API_KEY" ]; then
-            READY=0
-            for attempt in 1 2 3 4 5 6 7 8 9 10; do
-              rm -f /tmp/council-v15.txt
-              HTTP_CODE=$(curl --silent --show-error --max-time 20 \
-                --write-out '%{http_code}' \
-                --request POST "$PUBLIC_PRODUCTION_URL/api/council/run" \
-                --header 'content-type: application/json' \
-                --data @/tmp/council-v15-payload.json \
-                --output /tmp/council-v15.txt || true)
-              echo "production_alias_attempt=$attempt http=${HTTP_CODE:-none}"
-              if [ "$HTTP_CODE" = "503" ] && grep -q 'openai_api_key_missing' /tmp/council-v15.txt; then
-                READY=1
-                break
-              fi
-              sleep 4
-            done
-            test "$READY" = "1"
-            echo "Council v1.5 production code is live; Engineer seat is correctly gated until OPENAI_API_KEY is configured."
-            exit 0
-          fi
-
           READY=0
-          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+          GATED=0
+          for attempt in 1 2 3 4 5; do
             rm -f /tmp/council-v15.txt /tmp/council-v15.headers
-            curl --silent --show-error --no-buffer --max-time 59 \
+            HTTP_CODE=$(curl --silent --show-error --no-buffer --max-time 59 \
+              --write-out '%{http_code}' \
               --dump-header /tmp/council-v15.headers \
               --request POST "$PUBLIC_PRODUCTION_URL/api/council/run" \
               --header 'content-type: application/json' \
               --data @/tmp/council-v15-payload.json \
-              --output /tmp/council-v15.txt || true
+              --output /tmp/council-v15.txt || true)
+
+            if [ "$HTTP_CODE" = "503" ] && grep -q 'openai_api_key_missing' /tmp/council-v15.txt; then
+              GATED=1
+              READY=1
+              echo "production_alias_attempt=$attempt state=openai-gated"
+              break
+            fi
 
             ACTIVE_VERSION=$(python - <<'PY'
           version=''
@@ -182,8 +168,8 @@ jobs:
           PY
             )
 
-            echo "production_alias_attempt=$attempt version=${ACTIVE_VERSION:-none} engineer=${ENGINEER_MODEL:-none}"
-            if [ "$ACTIVE_VERSION" = "v1.5" ] && [ "$ENGINEER_MODEL" = "gpt-4o-mini" ]; then
+            echo "production_alias_attempt=$attempt http=${HTTP_CODE:-none} version=${ACTIVE_VERSION:-none} engineer=${ENGINEER_MODEL:-none}"
+            if [ "$HTTP_CODE" = "200" ] && [ "$ACTIVE_VERSION" = "v1.5" ] && [ "$ENGINEER_MODEL" = "gpt-4o-mini" ]; then
               READY=1
               break
             fi
@@ -191,14 +177,21 @@ jobs:
           done
           test "$READY" = "1"
 
+          if [ "$GATED" = "1" ]; then
+            echo "Council v1.5 is live but OpenAI Engineer is gated because the effective production OPENAI_API_KEY is missing."
+            exit 0
+          fi
+
           cat /tmp/council-v15.txt
           python - <<'PY'
           text=open('/tmp/council-v15.txt',encoding='utf-8').read()
           assert '### Error' not in text, text
+          assert '[PARTIAL_RESPONSE]' not in text, 'a provider response was truncated or incomplete'
+          assert '[ROLE_UNAVAILABLE]' not in text, 'a council role was unavailable'
           for role in ('Architect','Critic','Engineer','Judge'):
             assert f'### {role}' in text, role
           assert '[CONFLICT]' in text, 'missing conflict marker'
           assert '[SYNTHESIS]' in text, 'missing synthesis marker'
           assert len(text.strip()) > 200, 'stream unexpectedly short'
-          print('Council v1.5 mixed Gemini + OpenAI production stream E2E PASS')
+          print('Council v1.5 complete Gemini + OpenAI production stream E2E PASS')
           PY
