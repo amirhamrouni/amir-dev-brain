@@ -1,0 +1,76 @@
+name: Sync MCP Access Key
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-mcp-auth-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Require secrets
+        shell: bash
+        env:
+          MCP_ACCESS_KEY: ${{ secrets.MCP_ACCESS_KEY }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$MCP_ACCESS_KEY" || { echo "Missing GitHub secret MCP_ACCESS_KEY"; exit 1; }
+          test -n "$SUPABASE_ACCESS_TOKEN" || { echo "Missing GitHub secret SUPABASE_ACCESS_TOKEN"; exit 1; }
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.116.0
+
+      - name: Sync MCP_ACCESS_KEY to Supabase
+        shell: bash
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          MCP_ACCESS_KEY: ${{ secrets.MCP_ACCESS_KEY }}
+        run: |
+          set -euo pipefail
+          supabase secrets set MCP_ACCESS_KEY="$MCP_ACCESS_KEY" --project-ref hdcpvwsndxxflbednvsq
+
+      - name: Deploy council runner after secret sync
+        shell: bash
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          supabase functions deploy council-e2e-runner \
+            --project-ref hdcpvwsndxxflbednvsq \
+            --no-verify-jwt \
+            --use-api
+
+      - name: Verify canonical MCP accepts synced key
+        shell: bash
+        env:
+          MCP_ACCESS_KEY: ${{ secrets.MCP_ACCESS_KEY }}
+        run: |
+          set -euo pipefail
+          cat > /tmp/mcp-init.json <<'JSON'
+          {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"auth-sync-check","version":"1.0.0"}}}
+          JSON
+          HTTP_CODE=$(curl -sS -o /tmp/mcp-response.json -w "%{http_code}" \
+            -X POST \
+            -H "content-type: application/json" \
+            -H "accept: application/json, text/event-stream" \
+            -H "x-brain-key: $MCP_ACCESS_KEY" \
+            --data-binary @/tmp/mcp-init.json \
+            "https://hdcpvwsndxxflbednvsq.supabase.co/functions/v1/open-brain-mcp")
+          test "$HTTP_CODE" = "200" || { echo "MCP auth verification HTTP $HTTP_CODE"; exit 1; }
+          if grep -Eqi 'unauthorized|invalid.*key|access.*key' /tmp/mcp-response.json; then
+            echo "MCP rejected the synced key"
+            exit 1
+          fi
+          echo "MCP access key synchronized and accepted."
