@@ -37,6 +37,12 @@ export type CreateImplementationTaskInput = {
   idempotency_key: string;
 };
 
+export type TaskExecutionMetadata = {
+  branch_name?: string | null;
+  pr_number?: number | null;
+  pr_url?: string | null;
+};
+
 function toIso(value: Date | string) {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
@@ -133,6 +139,38 @@ export async function updateTaskStatus(
 
   const row = result.rows[0];
   if (!row) throw new Error("implementation_task_not_found");
+  return mapStoredTaskRow(row);
+}
+
+export async function updateTaskExecutionState(
+  taskId: string,
+  expectedStatus: TaskStatus,
+  nextStatus: TaskStatus,
+  metadata: TaskExecutionMetadata = {},
+): Promise<StoredTaskRow> {
+  const result = await getPostgresPool().query<TaskRow>(
+    `
+      update public.implementation_tasks
+      set
+        status = $3,
+        branch_name = coalesce($4, branch_name),
+        pr_number = coalesce($5, pr_number),
+        pr_url = coalesce($6, pr_url)
+      where task_id = $1 and status = $2
+      returning *
+    `,
+    [
+      taskId,
+      expectedStatus,
+      nextStatus,
+      metadata.branch_name ?? null,
+      metadata.pr_number ?? null,
+      metadata.pr_url ?? null,
+    ],
+  );
+
+  const row = result.rows[0];
+  if (!row) throw new Error("implementation_task_transition_conflict");
   return mapStoredTaskRow(row);
 }
 
