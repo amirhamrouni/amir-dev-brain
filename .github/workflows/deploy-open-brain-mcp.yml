@@ -7,6 +7,7 @@ on:
     paths:
       - ".github/workflows/deploy-open-brain-mcp.yml"
       - "scripts/patch-open-brain.mjs"
+      - "scripts/patch-approved-council-memory.mjs"
       - "scripts/patch-council-orchestrator.mjs"
       - "scripts/patch-council-realtime-pre.mjs"
       - "scripts/patch-council-realtime-post.mjs"
@@ -82,6 +83,9 @@ jobs:
       - name: Finalize council realtime handler
         run: node scripts/patch-council-realtime-post.mjs supabase/functions/open-brain-mcp/index.ts
 
+      - name: Add deterministic Council approval persistence
+        run: node scripts/patch-approved-council-memory.mjs supabase/functions/open-brain-mcp/index.ts
+
       - name: Normalize generated TypeScript
         shell: bash
         run: |
@@ -129,6 +133,8 @@ jobs:
           grep -q 'openrouter/free' supabase/functions/open-brain-mcp/index.ts
           grep -q 'max_tokens: 700' supabase/functions/open-brain-mcp/index.ts
           grep -q 'maxOutputTokens: 900' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'capture_council_decision' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'deterministic_no_generation' supabase/functions/open-brain-mcp/index.ts
           if grep -q 'google/gemini-2.0-flash-exp:free' supabase/functions/open-brain-mcp/index.ts; then
             echo 'Stale Gemini free council model remains in generated server'
             exit 1
