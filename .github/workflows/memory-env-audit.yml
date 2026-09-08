@@ -1,0 +1,55 @@
+name: Memory API Vercel Env Audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/memory-env-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: team_UKAtfO6HzAtWy9WQ5YuXlPLC
+      VERCEL_PROJECT_ID: prj_jFc0iqPP0ofyCATBibwmGQbpLMjZ
+    steps:
+      - name: Inspect required production variable metadata only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$VERCEL_TOKEN"
+          curl --fail-with-body --silent --show-error \
+            "https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/env?teamId=${VERCEL_ORG_ID}" \
+            --header "authorization: Bearer ${VERCEL_TOKEN}" \
+            --output /tmp/vercel-envs.json
+          python - <<'PY'
+          import json
+          data=json.load(open('/tmp/vercel-envs.json',encoding='utf-8'))
+          required=['DATABASE_URL','QDRANT_URL','QDRANT_API_KEY','OPENAI_API_KEY']
+          found={}
+          for item in data.get('envs',[]):
+              key=item.get('key')
+              if key not in required:
+                  continue
+              found.setdefault(key,[]).append({
+                  'target': item.get('target') or [],
+                  'type': item.get('type'),
+                  'gitBranch': item.get('gitBranch'),
+              })
+          missing=[]
+          for key in required:
+              rows=found.get(key,[])
+              prod=any('production' in row['target'] and not row['gitBranch'] for row in rows)
+              print(f'{key}: present={bool(rows)} production={prod} metadata={rows}')
+              if not prod:
+                  missing.append(key)
+          print('missing_or_not_production=' + ','.join(missing))
+          if missing:
+              raise SystemExit(2)
+          PY
