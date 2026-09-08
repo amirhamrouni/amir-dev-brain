@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Client } from "npm:@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "npm:@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { createClient } from "npm:@supabase/supabase-js";
 
 const PROJECT_REF = "hdcpvwsndxxflbednvsq";
 const MCP_URL = `https://${PROJECT_REF}.supabase.co/functions/v1/open-brain-mcp`;
@@ -47,6 +48,24 @@ function readDashboardKey(req: Request) {
   );
 }
 
+const realtimeAdmin = createClient(
+  Deno.env.get("SUPABASE_URL") || `https://${PROJECT_REF}.supabase.co`,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
+  { auth: { persistSession: false, autoRefreshToken: false } },
+);
+
+async function runnerBroadcast(runId: string, event: string, payload: Record<string, unknown>) {
+  if (!runId) return;
+  const channel = realtimeAdmin.channel(`council:${runId}`);
+  try {
+    await channel.httpSend(event, { run_id: runId, ...payload });
+  } catch (error) {
+    console.warn("runner_realtime_broadcast_failed", event, String((error as Error)?.message || error));
+  } finally {
+    await realtimeAdmin.removeChannel(channel).catch(() => undefined);
+  }
+}
+
 async function runCouncilInBackground({
   projectSlug,
   question,
@@ -64,11 +83,9 @@ async function runCouncilInBackground({
   runId: string;
   effectiveBrainKey: string;
 }) {
-  // Give the browser a short deterministic window to subscribe to the Realtime channel
-  // after receiving the immediate HTTP acknowledgement. This avoids losing the first
-  // broadcast without holding the request open for the debate itself.
   if (requestedTool === "amir_council_debate") {
     await new Promise((resolve) => setTimeout(resolve, 750));
+    await runnerBroadcast(runId, "status", { status: "worker_started" });
   }
 
   const requestedArguments = requestedTool === "capture_thought"
@@ -79,22 +96,26 @@ async function runCouncilInBackground({
     requestInit: { headers: { "x-brain-key": effectiveBrainKey } },
   });
 
-  const client = new Client({ name: "amir-council-dashboard-runner", version: "1.6.0" });
+  const client = new Client({ name: "amir-council-dashboard-runner", version: "1.7.0" });
   try {
     await client.connect(transport);
     const result = await client.callTool({ name: requestedTool, arguments: requestedArguments }, undefined, {
-      timeout: 240_000,
-      maxTotalTimeout: 240_000,
+      timeout: 115_000,
+      maxTotalTimeout: 115_000,
     });
     if ((result as any)?.isError) {
-      console.error("council_background_tool_error", { runId, requestedTool, result });
+      const detail = JSON.stringify(result).slice(0, 1800);
+      console.error("council_background_tool_error", { runId, requestedTool, detail });
+      if (requestedTool === "amir_council_debate") {
+        await runnerBroadcast(runId, "error", { status: "error", message: "Council MCP returned an error.", detail });
+      }
     }
   } catch (error) {
-    console.error("council_background_failed", {
-      runId,
-      requestedTool,
-      message: String((error as Error)?.message || error),
-    });
+    const message = String((error as Error)?.message || error);
+    console.error("council_background_failed", { runId, requestedTool, message });
+    if (requestedTool === "amir_council_debate") {
+      await runnerBroadcast(runId, "error", { status: "error", message });
+    }
   } finally {
     await client.close().catch(() => undefined);
   }
@@ -111,27 +132,18 @@ Deno.serve(async (req) => {
   const runnerAuthorized = Boolean(expectedRunner) && suppliedRunner === expectedRunner;
 
   if (!configuredBrainKey) {
-    return json(req, {
-      error: "mcp_access_key_missing",
-      message: "MCP_ACCESS_KEY غير مهيأ على الخادم.",
-    }, 500);
+    return json(req, { error: "mcp_access_key_missing", message: "MCP_ACCESS_KEY غير مهيأ على الخادم." }, 500);
   }
 
   if (!runnerAuthorized) {
     if (!suppliedBrain) {
-      return json(req, {
-        error: "missing_access_key",
-        message: "لم يصل مفتاح الوصول من الواجهة إلى الخادم.",
-      }, 401);
+      return json(req, { error: "missing_access_key", message: "لم يصل مفتاح الوصول من الواجهة إلى الخادم." }, 401);
     }
     if (suppliedBrain !== configuredBrainKey) {
       return json(req, {
         error: "auth_key_mismatch",
         message: "المفتاح الذي وصل من الواجهة لا يطابق MCP_ACCESS_KEY الحالي على Supabase.",
-        diagnostics: {
-          supplied_length: suppliedBrain.length,
-          configured_length: configuredBrainKey.length,
-        },
+        diagnostics: { supplied_length: suppliedBrain.length, configured_length: configuredBrainKey.length },
       }, 401);
     }
   }
@@ -150,30 +162,14 @@ Deno.serve(async (req) => {
 
   const realtimeAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
   if (!realtimeAnonKey && requestedTool === "amir_council_debate") {
-    return json(req, {
-      ok: false,
-      error: "realtime_anon_key_missing",
-      message: "SUPABASE_ANON_KEY غير متاح للـ Realtime handoff.",
-    }, 500);
+    return json(req, { ok: false, error: "realtime_anon_key_missing", message: "SUPABASE_ANON_KEY غير متاح للـ Realtime handoff." }, 500);
   }
 
-  const background = runCouncilInBackground({
-    projectSlug,
-    question,
-    rounds,
-    requestedTool,
-    content,
-    runId,
-    effectiveBrainKey: configuredBrainKey,
-  });
+  const background = runCouncilInBackground({ projectSlug, question, rounds, requestedTool, content, runId, effectiveBrainKey: configuredBrainKey });
 
-  // Supabase Edge Runtime keeps waitUntil work alive after the HTTP response is returned.
-  // This is the fire-and-forget boundary that prevents the browser request from waiting
-  // for the full multi-model council debate.
-  // deno-lint-ignore no-explicit-any
-  const edgeRuntime = (globalThis as any).EdgeRuntime;
-  if (edgeRuntime?.waitUntil) edgeRuntime.waitUntil(background);
-  else background.catch((error) => console.error("council_background_unhandled", error));
+  // Supabase's supported background-task boundary. The request returns now; the promise
+  // is kept alive by the Edge Runtime, subject to the platform's hard wall-clock limit.
+  EdgeRuntime.waitUntil(background);
 
   return json(req, {
     ok: true,
