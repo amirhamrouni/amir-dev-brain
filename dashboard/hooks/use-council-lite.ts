@@ -22,6 +22,11 @@ export type CouncilDecision = {
   model?: string;
 };
 
+export type ApprovalReceipt = {
+  decisionId: string;
+  vectorStatus: "PENDING" | "INDEXED" | "FAILED";
+};
+
 const LABELS: Record<StreamRole, { key: RoleKey; modelLabel: string; title: string; tone: "blue" | "red" }> = {
   Architect: { key: "architect", modelLabel: "Architect · Gemini", title: "المعمارية", tone: "blue" },
   Critic: { key: "critic", modelLabel: "Critic · Gemini", title: "النقد والاعتراض", tone: "red" },
@@ -218,10 +223,10 @@ export function useCouncilLite() {
   );
 
   const approveDecision = useCallback(
-    async (accessKey: string) => {
+    async (accessKey: string): Promise<ApprovalReceipt> => {
       if (!decision) throw new Error("لا توجد نتيجة مجلس لاعتمادها.");
       const key = accessKey.trim();
-      if (!key) throw new Error("أدخل مفتاح Open Brain للحفظ بعد الاعتماد.");
+      if (!key) throw new Error("أدخل مفتاح اعتماد الذاكرة الدائمة.");
 
       const response = await fetch("/api/council/approve", {
         method: "POST",
@@ -232,15 +237,33 @@ export function useCouncilLite() {
         },
         body: JSON.stringify({ decision }),
       });
-      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      const data = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        decision_id?: string;
+        vector_status?: ApprovalReceipt["vectorStatus"];
+      };
+
       if (!response.ok || !data.ok) {
-        throw new Error(
-          data.error === "open_brain_persist_failed"
-            ? "فشل حفظ القرار في Open Brain، لكن نتيجة المجلس بقيت سليمة في الواجهة."
-            : data.error || "تعذر حفظ القرار في Open Brain.",
-        );
+        const message =
+          data.error === "approval_key_not_configured"
+            ? "مفتاح اعتماد الذاكرة غير مضبوط في Vercel. اضبط COUNCIL_APPROVE_KEY أو MCP_ACCESS_KEY."
+            : data.error === "approval_auth_failed"
+              ? "مفتاح اعتماد الذاكرة غير صحيح."
+              : data.error === "decision_persist_failed"
+                ? "فشل حفظ القرار في الذاكرة الدائمة. لم يتم اعتباره محفوظاً."
+                : data.error || "تعذر حفظ القرار في الذاكرة الدائمة.";
+        throw new Error(message);
       }
-      return true;
+
+      if (!data.decision_id || !data.vector_status) {
+        throw new Error("تمت الاستجابة دون معرّف قرار أو vector_status صالح.");
+      }
+
+      return {
+        decisionId: data.decision_id,
+        vectorStatus: data.vector_status,
+      };
     },
     [decision],
   );
