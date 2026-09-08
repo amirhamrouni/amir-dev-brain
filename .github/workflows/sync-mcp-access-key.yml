@@ -46,6 +46,17 @@ jobs:
           set -euo pipefail
           supabase secrets set MCP_ACCESS_KEY="$MCP_ACCESS_KEY" --project-ref hdcpvwsndxxflbednvsq
 
+      - name: Redeploy Open Brain MCP after secret sync
+        shell: bash
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          supabase functions deploy open-brain-mcp \
+            --project-ref hdcpvwsndxxflbednvsq \
+            --no-verify-jwt \
+            --use-api
+
       - name: Deploy council runner after secret sync
         shell: bash
         env:
@@ -73,6 +84,8 @@ jobs:
             -H "x-brain-key: $MCP_ACCESS_KEY" \
             --data-binary @/tmp/mcp-init.json \
             "https://hdcpvwsndxxflbednvsq.supabase.co/functions/v1/open-brain-mcp")
+          echo "HTTP=$HTTP_CODE"
+          cat /tmp/mcp-response.json
           test "$HTTP_CODE" = "200" || { echo "MCP auth verification HTTP $HTTP_CODE"; exit 1; }
           if grep -Eqi 'unauthorized|invalid.*key|access.*key' /tmp/mcp-response.json; then
             echo "MCP rejected the synced key"
