@@ -83,13 +83,28 @@ function parseCouncilTranscript(text: string): CouncilEvent[] {
   return events;
 }
 
+function friendlyCouncilError(status: number, raw: unknown) {
+  const message = typeof raw === "string" ? raw : "";
+  if (status === 401 || /unauthorized|auth_key_mismatch/i.test(message)) {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("amir_mcp_access_key");
+    }
+    return "مفتاح الوصول المحفوظ قديم أو غير مطابق. تم مسحه من هذا الجهاز. أدخل MCP_ACCESS_KEY الحالي ثم أعد المحاولة.";
+  }
+  if (/MCP_ACCESS_KEY missing/i.test(message)) {
+    return "مفتاح MCP_ACCESS_KEY غير مضبوط على الخادم. يلزم مزامنة سر Supabase قبل تشغيل المجلس.";
+  }
+  return message || `فشل الاتصال بالمجلس (HTTP ${status}).`;
+}
+
 export function useCouncilRealtime() {
   const [events, setEvents] = useState<CouncilEvent[]>([]);
   const [state, setState] = useState<RealtimeState>("idle");
   const [error, setError] = useState<string | null>(null);
 
   const runDebate = useCallback(async ({ project, question, rounds, accessKey }: { project: string; question: string; rounds: number; accessKey: string }) => {
-    if (!accessKey.trim()) throw new Error("أدخل مفتاح الوصول الخاص أولاً.");
+    const normalizedKey = accessKey.trim();
+    if (!normalizedKey) throw new Error("أدخل مفتاح الوصول الخاص أولاً.");
     setState("running");
     setError(null);
     setEvents([]);
@@ -97,14 +112,17 @@ export function useCouncilRealtime() {
     try {
       const response = await fetch(COUNCIL_API, {
         method: "POST",
+        cache: "no-store",
         headers: {
           "content-type": "application/json",
-          "x-amir-key": accessKey.trim(),
+          "x-amir-key": normalizedKey,
         },
         body: JSON.stringify({ project_slug: project.trim() || "amir-dev-brain", question, rounds }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data?.ok) throw new Error(data?.error || `HTTP ${response.status}`);
+      if (!response.ok || !data?.ok) {
+        throw new Error(friendlyCouncilError(response.status, data?.error));
+      }
       const text = (data?.result?.content || [])
         .filter((item: unknown) => item && typeof item === "object" && "text" in item)
         .map((item: { text?: unknown }) => String(item.text || ""))
