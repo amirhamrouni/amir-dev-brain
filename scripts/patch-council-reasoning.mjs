@@ -31,14 +31,19 @@ if (!src.includes(handleLine)) throw new Error('MCP transport handleRequest mark
 src = src.replace(handleLine, `  let parsedBody: unknown = undefined;
   if (c.req.method === "POST") {
     const rawBody = await c.req.text();
+    // Supabase Edge currently presents this MCP POST as a framed payload:
+    // "Content-Length: <n>\\r\\n\\r\\n{...json...}". Strip only that verified framing.
+    const framed = rawBody.match(/^Content-Length:\\s*\\d+\\r?\\n\\r?\\n([\\s\\S]*)$/i);
+    const jsonBody = framed ? framed[1] : rawBody;
     try {
-      parsedBody = JSON.parse(rawBody);
+      parsedBody = JSON.parse(jsonBody);
     } catch (err) {
       return c.json({
         error: "mcp_request_parse_failed",
         message: String((err as Error)?.message || err),
         content_type: c.req.header("content-type") || null,
         content_length: c.req.header("content-length") || null,
+        framed_body_detected: Boolean(framed),
         raw_prefix: rawBody.slice(0, 160),
       }, 400, corsHeaders);
     }
@@ -46,4 +51,4 @@ src = src.replace(handleLine, `  let parsedBody: unknown = undefined;
   const response = await transport.handleRequest(c, parsedBody);`);
 
 fs.writeFileSync(target, src);
-console.log('Constrained council reasoning budget, normalized MCP auth, and instrumented request parsing');
+console.log('Constrained council reasoning budget, normalized MCP auth, and stripped verified Supabase framing');
