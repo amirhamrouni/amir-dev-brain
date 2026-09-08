@@ -200,3 +200,7 @@ export async function POST(_request: NextRequest) {
     { status: ok ? 200 : 500 },
   );
 }
+
+export async function GET(request: NextRequest) {
+  return POST(request);
+}
