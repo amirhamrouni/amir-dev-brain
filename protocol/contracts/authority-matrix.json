@@ -1,0 +1,109 @@
+{
+  "contract": "authority-matrix",
+  "version": "1.0.0",
+  "principle": "Observe, Propose, Modify, and Approve are separate authorities. No agent gains approval authority merely because it can inspect, reason, or modify artifacts.",
+  "authorities": ["OBSERVE", "PROPOSE", "MODIFY", "APPROVE"],
+  "principals": {
+    "amir_owner": {
+      "authorities": {
+        "OBSERVE": { "allowed": true, "scope": ["*"] },
+        "PROPOSE": { "allowed": true, "scope": ["*"] },
+        "MODIFY": { "allowed": true, "scope": ["*"] },
+        "APPROVE": { "allowed": true, "scope": ["DECISION", "POLICY", "AUTHORITY_CHANGE", "HIGH_RISK_CHANGE"] }
+      }
+    },
+    "brain_watchdog": {
+      "authorities": {
+        "OBSERVE": { "allowed": true, "scope": ["VERSION", "DEPENDENCY", "POLICY", "EVIDENCE", "SECURITY_FINDING", "WORKFLOW", "DECISION_METADATA"] },
+        "PROPOSE": { "allowed": true, "scope": ["REVALIDATION", "DRIFT_ASSESSMENT", "EVIDENCE_STATUS_CHANGE", "REVIEW_REQUEST"] },
+        "MODIFY": {
+          "allowed": true,
+          "scope": ["EVIDENCE_STATUS", "REVALIDATION_METADATA", "WATCHDOG_REPORT"],
+          "constraints": [
+            "must_not_change_decision_statement",
+            "must_not_change_decision_authority",
+            "must_not_mark_decision_revoked_or_superseded",
+            "must_preserve_audit_history"
+          ]
+        },
+        "APPROVE": { "allowed": false, "scope": [] }
+      }
+    },
+    "security_reviewer": {
+      "authorities": {
+        "OBSERVE": { "allowed": true, "scope": ["REPOSITORY", "DEPENDENCY", "SECURITY_EVIDENCE", "RELEVANT_POLICY"] },
+        "PROPOSE": { "allowed": true, "scope": ["FINDING", "REMEDIATION", "REVALIDATION"] },
+        "MODIFY": {
+          "allowed": true,
+          "scope": ["EVIDENCE", "FINDING", "PROPOSAL"],
+          "constraints": ["must_not_promote_finding_to_decision", "must_not_self_approve_remediation"]
+        },
+        "APPROVE": { "allowed": false, "scope": [] }
+      }
+    },
+    "council_agent": {
+      "authorities": {
+        "OBSERVE": { "allowed": true, "scope": ["AUTHORIZED_CONTEXT", "EVIDENCE", "FACT", "FINDING", "DECISION"] },
+        "PROPOSE": { "allowed": true, "scope": ["OPINION", "PROPOSAL", "DRAFT_DECISION"] },
+        "MODIFY": {
+          "allowed": true,
+          "scope": ["OPINION", "PROPOSAL", "DRAFT_DECISION"],
+          "constraints": ["must_not_modify_approved_decision", "must_not_change_authority_matrix"]
+        },
+        "APPROVE": { "allowed": false, "scope": [] }
+      }
+    },
+    "implementation_agent": {
+      "authorities": {
+        "OBSERVE": { "allowed": true, "scope": ["TASK_REPOSITORY", "APPROVED_DECISION", "RELEVANT_EVIDENCE", "CI"] },
+        "PROPOSE": { "allowed": true, "scope": ["CODE_CHANGE", "TEST_CHANGE", "REMEDIATION", "MIGRATION_PLAN"] },
+        "MODIFY": {
+          "allowed": true,
+          "scope": ["TASK_REPOSITORY"],
+          "constraints": [
+            "must_respect_approved_decisions",
+            "must_stay_within_task_scope",
+            "must_not_modify_secrets",
+            "must_not_self_approve_governance_decisions"
+          ]
+        },
+        "APPROVE": { "allowed": false, "scope": [] }
+      }
+    },
+    "deterministic_autofix": {
+      "authorities": {
+        "OBSERVE": { "allowed": true, "scope": ["TASK_REPOSITORY", "CI", "ALLOWLISTED_RULES"] },
+        "PROPOSE": { "allowed": true, "scope": ["DETERMINISTIC_FIX"] },
+        "MODIFY": {
+          "allowed": true,
+          "scope": ["ALLOWLISTED_LOW_RISK_CODE"],
+          "constraints": [
+            "rule_in_auto_fix_allowlist",
+            "same_input_same_output",
+            "second_application_zero_diff",
+            "typecheck_pass",
+            "unit_tests_pass",
+            "required_integration_tests_pass",
+            "security_scan_pass",
+            "no_auth_billing_migrations_secrets_permissions_changes",
+            "no_public_api_contract_change",
+            "no_significant_drift"
+          ]
+        },
+        "APPROVE": { "allowed": false, "scope": [] }
+      },
+      "auto_merge": {
+        "allowed": true,
+        "only_if_all_modify_constraints_pass": true,
+        "note": "Auto-merge is a guarded repository operation, not governance approval authority."
+      }
+    }
+  },
+  "global_invariants": [
+    "Only Amir may approve or revoke authoritative decisions unless a future Amir-approved policy explicitly delegates that authority.",
+    "A FINDING is not a DECISION.",
+    "A PROPOSAL is not a DECISION.",
+    "Automated modification authority never implies approval authority.",
+    "All authority-sensitive mutations must remain auditable."
+  ]
+}
