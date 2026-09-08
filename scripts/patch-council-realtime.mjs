@@ -28,9 +28,15 @@ const schemaMarker = '        rounds: z.number().int().min(1).max(3).optional().
 if (!src.includes(schemaMarker)) throw new Error('Council input schema marker not found');
 src = src.replace(schemaMarker, schemaMarker + '        run_id: z.string().optional().describe("Realtime run id supplied by the asynchronous council runner"),\n');
 
-const callbackMarker = '    async ({ project_slug, question, rounds }) => {';
-if (!src.includes(callbackMarker)) throw new Error('Council callback marker not found');
-src = src.replace(callbackMarker, '    async ({ project_slug, question, rounds, run_id }) => {');
+const governedCallback = '    async ({ project_slug, question, rounds, pending_action }) => {';
+const plainCallback = '    async ({ project_slug, question, rounds }) => {';
+if (src.includes(governedCallback)) {
+  src = src.replace(governedCallback, '    async ({ project_slug, question, rounds, pending_action, run_id }) => {');
+} else if (src.includes(plainCallback)) {
+  src = src.replace(plainCallback, '    async ({ project_slug, question, rounds, run_id }) => {');
+} else {
+  throw new Error('Council callback marker not found');
+}
 
 const topicMarker = '        const topic = question || "Compare the current architecture and MVP direction, challenge weak assumptions, and converge on the strongest recommendation for Amir.";\n';
 if (!src.includes(topicMarker)) throw new Error('Council topic marker not found');
