@@ -8,6 +8,7 @@ on:
       - ".github/workflows/deploy-open-brain-mcp.yml"
       - "scripts/patch-open-brain.mjs"
       - "scripts/patch-council-orchestrator.mjs"
+      - "scripts/patch-council-realtime.mjs"
       - "scripts/patch-council-reasoning.mjs"
       - "scripts/patch-council-free-tier.mjs"
       - "scripts/patch-st003-retrieval.mjs"
@@ -59,6 +60,9 @@ jobs:
       - name: Add autonomous AI council orchestrator
         run: node scripts/patch-council-orchestrator.mjs supabase/functions/open-brain-mcp/index.ts
 
+      - name: Add council realtime broadcasts
+        run: node scripts/patch-council-realtime.mjs supabase/functions/open-brain-mcp/index.ts
+
       - name: Apply legacy council budget patch
         run: node scripts/patch-council-reasoning.mjs supabase/functions/open-brain-mcp/index.ts
 
@@ -94,6 +98,8 @@ jobs:
           grep -q 'github_repo_state' supabase/functions/open-brain-mcp/index.ts
           grep -q 'github_fetch_file' supabase/functions/open-brain-mcp/index.ts
           grep -q 'amir_council_debate' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'councilRealtimeBroadcast' supabase/functions/open-brain-mcp/index.ts
+          grep -q 'run_id: z.string' supabase/functions/open-brain-mcp/index.ts
           grep -q 'amir_retrieve_memory_context' supabase/functions/open-brain-mcp/index.ts
           grep -q 'amir_governance_preflight' supabase/functions/open-brain-mcp/index.ts
           grep -q 'retrieveSt003Context(topic, safe, 8)' supabase/functions/open-brain-mcp/index.ts
