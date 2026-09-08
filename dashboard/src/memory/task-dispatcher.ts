@@ -139,8 +139,8 @@ export function decisionSnapshotSha256(decision: Decision) {
 }
 
 function validateBaseRef(value: string) {
-  const normalized = value.trim();
-  if (!normalized || normalized.length > 200 || /[\u0000-\u001f\u007f]/.test(normalized)) {
+  const normalized = value.trim().toLowerCase();
+  if (!/^[0-9a-f]{40}$/.test(normalized)) {
     throw new Error("invalid_base_ref");
   }
   return normalized;
