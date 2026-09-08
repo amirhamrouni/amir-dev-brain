@@ -30,5 +30,13 @@ const providedLine = '  const provided = c.req.header("x-brain-key") || new URL(
 if (!src.includes(providedLine)) throw new Error('MCP provided-key marker not found');
 src = src.replace(providedLine, '  const provided = normalizeMcpAccessKey(c.req.header("x-brain-key") || new URL(c.req.url).searchParams.get("key"));');
 
+// @hono/mcp supports an explicit parsedBody argument. On Supabase Edge Runtime,
+// parsing inside the transport can misread the proxied request body. Parse JSON once
+// through Hono and pass the parsed payload directly to the transport.
+const handleLine = '  const response = await transport.handleRequest(c);';
+if (!src.includes(handleLine)) throw new Error('MCP transport handleRequest marker not found');
+src = src.replace(handleLine, `  const parsedBody = c.req.method === "POST" ? await c.req.json() : undefined;
+  const response = await transport.handleRequest(c, parsedBody);`);
+
 fs.writeFileSync(target, src);
-console.log('Constrained council reasoning budget and normalized MCP auth key handling');
+console.log('Constrained council reasoning budget, normalized MCP auth, and explicit MCP body parsing');
