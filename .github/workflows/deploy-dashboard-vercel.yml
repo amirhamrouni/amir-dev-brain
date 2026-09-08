@@ -23,7 +23,7 @@ jobs:
       VERCEL_PROJECT_ID: prj_jFc0iqPP0ofyCATBibwmGQbpLMjZ
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      GEMINI_MODEL: gemini-3.6-flash
+      GEMINI_MODEL: gemini-3.5-flash-lite
       VERCEL_CLI_VERSION: 59.11.7
       VERCEL_TELEMETRY_DISABLED: 1
       CI: 1
@@ -105,7 +105,7 @@ jobs:
       - name: Smoke test live Council Lite stream
         env:
           PUBLIC_PRODUCTION_URL: https://amir-brain-console.vercel.app
-          EXPECTED_MODEL: gemini-3.6-flash
+          EXPECTED_MODEL: gemini-3.5-flash-lite
         shell: bash
         run: |
           set -euo pipefail
