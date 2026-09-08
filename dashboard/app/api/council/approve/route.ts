@@ -1,11 +1,11 @@
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import { NextRequest } from "next/server";
+import { saveDecision } from "@/src/memory/memory-api";
+import type { Decision } from "@/src/memory/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 20;
-
-const MCP_URL = "https://hdcpvwsndxxflbednvsq.supabase.co/functions/v1/open-brain-mcp";
-const MCP_PROTOCOL_VERSION = "2025-03-26";
+export const maxDuration = 30;
 
 type CouncilDecision = {
   project: string;
@@ -24,22 +24,26 @@ type CouncilDecision = {
   model?: string;
 };
 
-type JsonRpcFrame = {
-  error?: unknown;
-  result?: {
-    isError?: boolean;
-    content?: Array<{ type?: string; text?: string }>;
-  };
-};
-
 function normalizeKey(raw: string) {
   let value = raw.trim();
-  value = value.replace(/^MCP_ACCESS_KEY\s*=\s*/i, "").trim();
+  value = value.replace(/^(?:MCP_ACCESS_KEY|COUNCIL_APPROVE_KEY)\s*=\s*/i, "").trim();
   value = value.replace(/^Bearer\s+/i, "").trim();
-  if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
     value = value.slice(1, -1).trim();
   }
   return value;
+}
+
+function secureKeyMatch(provided: string, expected: string) {
+  const providedBytes = Buffer.from(provided, "utf8");
+  const expectedBytes = Buffer.from(expected, "utf8");
+  return (
+    providedBytes.length === expectedBytes.length &&
+    timingSafeEqual(providedBytes, expectedBytes)
+  );
 }
 
 function validDecision(value: unknown): value is CouncilDecision {
@@ -55,58 +59,51 @@ function validDecision(value: unknown): value is CouncilDecision {
       typeof item.responses.judge === "string" &&
       typeof item.synthesis === "string" &&
       item.synthesis.trim() &&
-      item.timestamp,
+      item.timestamp &&
+      item.council_version,
   );
 }
 
-function parseMcpFrames(raw: string): JsonRpcFrame[] {
-  const frames: JsonRpcFrame[] = [];
-  const candidates = [raw.trim()];
-
-  for (const line of raw.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith("data:")) candidates.push(trimmed.slice(5).trim());
-  }
-
-  for (const candidate of candidates) {
-    if (!candidate || candidate === "[DONE]") continue;
-    try {
-      const parsed = JSON.parse(candidate) as JsonRpcFrame;
-      if (parsed && typeof parsed === "object") frames.push(parsed);
-    } catch {
-      // Ignore non-JSON SSE framing lines.
-    }
-  }
-
-  return frames;
+function createDecisionId() {
+  return `ADB-${randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase()}`;
 }
 
-function mcpFailure(frames: JsonRpcFrame[]) {
-  return frames.find((frame) => frame.error || frame.result?.isError === true);
+function decisionTitle(question: string) {
+  const lines = question
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const topicLine = lines.find((line) => line.startsWith("موضوع النقاش:"));
+  const raw = topicLine?.slice("موضوع النقاش:".length).trim() || lines[0] || "قرار مجلس Amir Dev Brain";
+  return raw.slice(0, 180);
 }
 
-function persistedThoughtId(frames: JsonRpcFrame[]) {
-  for (const frame of frames) {
-    for (const item of frame.result?.content || []) {
-      if (item.type !== "text" || !item.text) continue;
-      try {
-        const parsed = JSON.parse(item.text) as { thought_id?: string | null };
-        if (parsed.thought_id) return parsed.thought_id;
-      } catch {
-        // The MCP tool may return human-readable text; that is still a valid success.
-      }
-    }
-  }
-  return null;
-}
-
-function safeDetail(raw: string) {
-  return raw.replace(/\s+/g, " ").slice(0, 500);
+function modelContext(decision: CouncilDecision) {
+  return [
+    `council:${decision.council_version}`,
+    decision.model ? `models:${decision.model}` : "",
+    `conflict_flags:${decision.conflict_flags?.length ?? 0}`,
+  ].filter(Boolean);
 }
 
 export async function POST(req: NextRequest) {
-  const key = normalizeKey(req.headers.get("x-brain-key") || req.headers.get("authorization") || "");
-  if (!key) return Response.json({ ok: false, error: "missing_access_key" }, { status: 401 });
+  const expectedKey = normalizeKey(
+    process.env.COUNCIL_APPROVE_KEY || process.env.MCP_ACCESS_KEY || "",
+  );
+  if (!expectedKey) {
+    console.error("[council/approve] approval key is not configured");
+    return Response.json(
+      { ok: false, error: "approval_key_not_configured" },
+      { status: 503 },
+    );
+  }
+
+  const providedKey = normalizeKey(
+    req.headers.get("x-brain-key") || req.headers.get("authorization") || "",
+  );
+  if (!providedKey || !secureKeyMatch(providedKey, expectedKey)) {
+    return Response.json({ ok: false, error: "approval_auth_failed" }, { status: 401 });
+  }
 
   let body: { decision?: unknown };
   try {
@@ -116,77 +113,59 @@ export async function POST(req: NextRequest) {
   }
 
   if (!validDecision(body.decision)) {
-    return Response.json({ ok: false, error: "invalid_council_decision" }, { status: 400 });
+    return Response.json(
+      { ok: false, error: "invalid_council_decision" },
+      { status: 400 },
+    );
   }
 
-  const decision = body.decision;
-  let response: Response;
+  const councilDecision = body.decision;
+  const now = new Date().toISOString();
+  const decision: Decision = {
+    id: createDecisionId(),
+    project: councilDecision.project.trim(),
+    title: decisionTitle(councilDecision.question),
+    question: councilDecision.question,
+    synthesis: councilDecision.synthesis,
+    state: "ACTIVE",
+    approvedBy: "amir_owner",
+    approvedAt: now,
+    createdAt: now,
+    updatedAt: now,
+    councilVersion: councilDecision.council_version,
+    modelContext: modelContext(councilDecision),
+    versionBindings: [],
+    evidenceLinks: [],
+    reviewPolicy: {
+      reviewAfter: null,
+      maxAgeDays: 90,
+      triggers: ["manual_review"],
+    },
+    supersedes: null,
+    vectorStatus: "PENDING",
+  };
 
   try {
-    response = await fetch(MCP_URL, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        accept: "application/json, text/event-stream",
-        "x-brain-key": key,
-        "mcp-protocol-version": MCP_PROTOCOL_VERSION,
-      },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: crypto.randomUUID(),
-        method: "tools/call",
-        params: {
-          name: "capture_council_decision",
-          arguments: {
-            project: decision.project,
-            question: decision.question,
-            synthesis: decision.synthesis,
-            timestamp: decision.timestamp,
-            council_version: decision.council_version,
-            model: decision.model,
-            conflict_flags: decision.conflict_flags || [],
-          },
-        },
-      }),
-      cache: "no-store",
-      signal: AbortSignal.timeout(12_000),
-    });
-  } catch (cause) {
-    const message = cause instanceof Error ? cause.message : String(cause);
-    console.error("[council/approve] Open Brain request failed", { message });
-    return Response.json(
-      { ok: false, error: "open_brain_unreachable" },
-      { status: 502 },
-    );
-  }
-
-  const raw = await response.text();
-  const frames = parseMcpFrames(raw);
-  const failure = mcpFailure(frames);
-
-  if (!response.ok || failure || frames.length === 0) {
-    console.error("[council/approve] Open Brain persistence failed", {
-      status: response.status,
-      rpc_error: Boolean(failure),
-      detail: safeDetail(raw),
-    });
+    const stored = await saveDecision(decision);
     return Response.json(
       {
-        ok: false,
-        error: /unauthorized|auth_key_mismatch/i.test(raw) ? "open_brain_auth_failed" : "open_brain_persist_failed",
+        ok: true,
+        persisted: true,
+        decision_id: stored.id,
+        decision_state: stored.state,
+        vector_status: stored.vectorStatus,
+        indexed: stored.vectorStatus === "INDEXED",
+        persistence_mode: "postgres_ssot_qdrant_index",
+        approved_at: stored.approvedAt,
       },
-      { status: response.status >= 400 ? response.status : 502 },
+      { status: 200 },
+    );
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    console.error("[council/approve] Memory API persistence failed", { message });
+    return Response.json(
+      { ok: false, error: "decision_persist_failed" },
+      { status: 500 },
     );
   }
-
-  return Response.json(
-    {
-      ok: true,
-      persisted: true,
-      thought_id: persistedThoughtId(frames),
-      persistence_mode: "deterministic_no_generation",
-      generated_at: decision.timestamp,
-    },
-    { status: 200 },
-  );
 }
