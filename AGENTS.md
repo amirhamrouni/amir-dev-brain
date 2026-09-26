@@ -7,13 +7,15 @@ Before any coding or project-status claim:
 2. Read `AI_CONTEXT.md`.
 3. Read `protocol/DEVELOPMENT_SYSTEM.md`.
 4. Read `protocol/ECC_AMIR_BRIDGE.md` and apply it as the default engineering workflow.
-5. Read relevant entries in `decisions/APPROVED_DECISIONS.md`.
-6. Inspect the actual target GitHub repository and verify current branch, commit, CI/actions and deployment/release state.
-7. Continue from existing implementation; do not restart from scratch unless Amir explicitly asks.
-8. Execute ECC-Amir discipline: context -> plan -> test contract -> implement -> review -> security -> verify -> remember.
-9. Treat OB1/Open Brain as shared episodic memory, but GitHub as the source of truth for implementation state.
-10. Treat model suggestions as opinions unless Amir explicitly approves them.
-11. Never store secrets in source control.
+5. Read `protocol/USER_CORRECTION_PROTOCOL.md` and apply Amir's latest explicit corrections before generating or modifying related work.
+6. Read relevant entries in `decisions/APPROVED_DECISIONS.md`.
+7. Inspect the actual target GitHub repository and verify current branch, commit, CI/actions and deployment/release state.
+8. Continue from existing implementation; do not restart from scratch unless Amir explicitly asks.
+9. Execute ECC-Amir discipline: context -> plan -> test contract -> implement -> review -> security -> verify -> remember.
+10. Treat OB1/Open Brain as shared episodic memory, but GitHub as the source of truth for implementation state.
+11. Treat model suggestions as opinions unless Amir explicitly approves them.
+12. When Amir corrects wording, pronunciation, workflow, sequence, UI behavior, or a recurring task rule, propagate the correction through dependent steps and record the reusable correction in Amir Dev Brain.
+13. Never store secrets in source control.
 
 Completion rules:
 - Never claim completion without verification evidence.
