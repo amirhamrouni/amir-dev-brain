@@ -1,0 +1,47 @@
+{
+  "schema": "amir.content.cycle.v1",
+  "cycle_at": "2026-09-26T15:15:00+02:00",
+  "timezone": "Europe/Amsterdam",
+  "topic": "Google Antigravity SDK local AI agents",
+  "source": {
+    "name": "Google Developers Blog",
+    "published_at": "2026-09-23",
+    "url": "https://developers.googleblog.com/introducing-support-for-local-ai-models-in-the-antigravity-sdk/",
+    "verified_facts": [
+      "Antigravity SDK supports local workflows using Gemma 4 26B A4B via LiteRT.",
+      "Local workflows can run offline.",
+      "The SDK can use OpenAI-compatible local servers including Ollama, LM Studio and vLLM.",
+      "Google recommends more than 24GB VRAM or unified memory for the highlighted Gemma 4 26B local path.",
+      "Google's recorded hybrid demo reported 97.2% of tokens running locally."
+    ]
+  },
+  "production": {
+    "filename": "Amir_Antigravity_Local_AI_20260926.mp4",
+    "sha256": "7bd3c02c343eb3ba8c0d799bbcbc4b69480f6e4d4f779c9c226ddfbe9b4dc79c",
+    "resolution": "1080x1920",
+    "duration_seconds": 19.2,
+    "scene_count": 6,
+    "video_codec": "h264",
+    "audio_codec": "aac",
+    "audio": "original synthetic electronic bed created for this reel",
+    "visual_identity": "Amir black/gold tech identity with @amir_nederland and @amir_hamrouniii",
+    "ai_generated": true,
+    "qc": {
+      "black_frames": "none_detected",
+      "rtl_visual_gate": "passed on extracted final-video frames",
+      "generated_text_artifact_fix": "removed unsupported emoji glyph from final CTA before rerender",
+      "mobile_legibility": "passed"
+    }
+  },
+  "publish": {
+    "brand_id": 6926406,
+    "scheduled_at": "2026-09-26T18:00:00+02:00",
+    "metricool_id": 382488795,
+    "metricool_uuid": "-8431789754808122856",
+    "instagram_status": "PENDING",
+    "tiktok_status": "PENDING",
+    "auto_publish": true,
+    "metricool_media_url": "https://static.metricool.com/planner/202609/6926406-file-14112364808664008467.mp4"
+  },
+  "outcome": "SUCCESS_VERIFIED_SCHEDULED_BOTH_NETWORKS"
+}
