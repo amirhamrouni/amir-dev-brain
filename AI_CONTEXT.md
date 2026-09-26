@@ -6,19 +6,26 @@ This root-level file exists as a compatibility fallback for AI clients that cann
 1. Actual target project repository = source of truth for code, commits, CI, releases, and deployment history.
 2. `projects/*.md` = structured project memory and latest recorded checkpoint.
 3. `decisions/APPROVED_DECISIONS.md` = Amir-approved authoritative decisions.
-4. `council/*.md` = model opinions only.
-5. `PROJECTS.md` = central registry/index.
-6. This file = access fallback only; it must not override more specific verified sources.
+4. `protocol/USER_CORRECTION_PROTOCOL.md` = durable rules derived from Amir's explicit corrections.
+5. `council/*.md` = model opinions only.
+6. `PROJECTS.md` = central registry/index.
+7. This file = access fallback only; it must not override more specific verified sources.
 
 ## Mandatory engineering protocol
 Before coding or modifying any Amir project:
 1. Read `PROJECTS.md`.
 2. Read the relevant project record when accessible.
 3. Read applicable approved decisions.
-4. Inspect the actual target GitHub repository and default branch.
-5. Verify current commit/CI/deployment state before making current-status claims.
-6. Continue from existing implementation; do not restart from scratch unless Amir explicitly requests it.
-7. Apply ECC-style engineering discipline: inspect/context recovery → plan smallest correct change → implement → review → test/build/lint → fix failures → verify CI/release/deployment → update Amir Dev Brain after material verified milestones.
+4. Read and apply `protocol/USER_CORRECTION_PROTOCOL.md` for any relevant wording, pronunciation, workflow, sequencing, UI, or recurring-task correction from Amir.
+5. Inspect the actual target GitHub repository and default branch.
+6. Verify current commit/CI/deployment state before making current-status claims.
+7. Continue from existing implementation; do not restart from scratch unless Amir explicitly requests it.
+8. Apply ECC-style engineering discipline: inspect/context recovery → plan smallest correct change → implement → review → test/build/lint → fix failures → verify CI/release/deployment → update Amir Dev Brain after material verified milestones.
+
+## User-correction persistence rule
+- Amir's newest explicit correction wins over earlier assistant/model wording.
+- Fix the current output, propagate the fix through dependent steps, and record reusable corrections in Amir Dev Brain.
+- Current Tunisian-script corrections include `ena el mo7ami` for «أنا المحامي» in the present script context and `Ya ra2is el markaz` for «يا رئيس المركز».
 
 ## Status vocabulary
 - `verified-current`: verified against the live repository or deployment in the current session.
