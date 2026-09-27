@@ -59,13 +59,24 @@ jobs:
                         'try (java.io.FileOutputStream out = new java.io.FileOutputStream(tp)) { out.write(text.toString().getBytes(StandardCharsets.UTF_8)); }')
           p.write_text(s)
 
-          # Java core APIs used by the first port but unavailable on minSdk 26.
           for p in root.glob('*.java'):
               s = p.read_text()
               s = s.replace('.isBlank()', '.trim().isEmpty()')
               s = re.sub(r'Set\.of\((.*?)\)', r'new java.util.HashSet<>(java.util.Arrays.asList(\1))', s, flags=re.S)
               p.write_text(s)
           PY
+
+      - name: Runtime source audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT=tools/account-factory-android/app/src/main/java/com/amir/accountfactory
+          echo '===== MainActivity.java ====='
+          sed -n '1,360p' "$ROOT/MainActivity.java"
+          echo '===== Runner.java ====='
+          sed -n '1,360p' "$ROOT/Runner.java"
+          echo '===== AppDb.java ====='
+          sed -n '1,300p' "$ROOT/AppDb.java"
 
       - uses: actions/setup-java@v5
         with:
