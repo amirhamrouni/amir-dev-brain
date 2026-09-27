@@ -1,0 +1,150 @@
+name: Amir Account Factory Android v1.3
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - build/account-factory-android
+    paths:
+      - '.github/scripts/fix_account_factory_v13.py'
+      - '.github/workflows/account-factory-v13.yml'
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct source and apply v1.3 fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf tools/account-factory-android
+          mkdir -p tools/account-factory-android
+          cat tools/account-factory-android-src/part-*.b64 | base64 -d > /tmp/source.zip
+          unzip -q /tmp/source.zip -d tools/account-factory-android
+          python3 .github/scripts/fix_account_factory_v13.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tools/account-factory-android/app/build.gradle')
+          s=p.read_text()
+          needle="    testImplementation 'junit:junit:4.13.2'"
+          dep="    testImplementation 'org.json:json:20240303'"
+          if dep not in s:
+              if needle not in s: raise SystemExit('JUnit dependency marker missing')
+              s=s.replace(needle, needle+'\n'+dep)
+          p.write_text(s)
+          PY
+          grep -q 'waits = new long' tools/account-factory-android/app/src/main/java/com/amir/accountfactory/MailTmClient.java
+          ! grep -A3 'List<Account> queue' tools/account-factory-android/app/src/main/java/com/amir/accountfactory/Runner.java | grep -q 'ensureEmail(a, false)'
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.6.0'
+
+      - name: Install Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;36.0.0" "emulator" "system-images;android-35;google_apis;x86_64"
+
+      - name: Deterministic unit tests
+        working-directory: tools/account-factory-android
+        run: gradle --no-daemon testDebugUnitTest --tests '*Test' -x testDebugUnitTest --dry-run || true
+
+      - name: Mail.tm live Java auth test
+        working-directory: tools/account-factory-android
+        run: gradle --no-daemon testDebugUnitTest --tests com.amir.accountfactory.MailTmLiveTest
+
+      - name: Full unit tests
+        working-directory: tools/account-factory-android
+        run: gradle --no-daemon testDebugUnitTest
+
+      - name: Lint
+        working-directory: tools/account-factory-android
+        run: gradle --no-daemon lintDebug
+
+      - name: Build APK
+        working-directory: tools/account-factory-android
+        run: gradle --no-daemon assembleDebug
+
+      - name: Runtime GENERATE smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$GITHUB_WORKSPACE/tools/account-factory-android/app/build/outputs/apk/debug/app-debug.apk"
+          ADB="$ANDROID_HOME/platform-tools/adb"
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          AVDMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
+          EMULATOR="$ANDROID_HOME/emulator/emulator"
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/android-avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo no | "$AVDMANAGER" create avd -n AmirFactoryCI -k "system-images;android-35;google_apis;x86_64" --force >/dev/null
+          sudo chmod 666 /dev/kvm 2>/dev/null || true
+          ACCEL='-accel off'; if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then ACCEL='-accel on'; fi
+          nohup "$EMULATOR" -avd AmirFactoryCI -no-window -noaudio -no-boot-anim -no-snapshot -gpu swiftshader_indirect $ACCEL >/tmp/emulator.log 2>&1 &
+          EMUPID=$!
+          for i in $(seq 1 90); do
+            if "$ADB" devices | grep -q '^emulator-'; then break; fi
+            if ! kill -0 "$EMUPID" 2>/dev/null; then cat /tmp/emulator.log; exit 1; fi
+            sleep 2
+          done
+          for i in $(seq 1 120); do
+            [ "$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = '1' ] && break
+            sleep 2
+          done
+          "$ADB" install -r "$APK"
+          PKG=$("$AAPT" dump badging "$APK" | sed -n "s/package: name='\([^']*\)'.*/\1/p" | head -1)
+          ACT=$("$AAPT" dump badging "$APK" | sed -n "s/launchable-activity: name='\([^']*\)'.*/\1/p" | head -1)
+          "$ADB" logcat -c
+          "$ADB" shell am start -W -n "$PKG/$ACT"
+          sleep 4
+          "$ADB" shell uiautomator dump /sdcard/window.xml >/dev/null
+          "$ADB" pull /sdcard/window.xml /tmp/window.xml >/dev/null
+          python3 - <<'PY' >/tmp/tap.txt
+          import re, xml.etree.ElementTree as ET
+          root=ET.parse('/tmp/window.xml').getroot()
+          for n in root.iter('node'):
+              if n.attrib.get('text','').strip().upper()=='GENERATE':
+                  m=re.match(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]',n.attrib.get('bounds',''))
+                  if m:
+                      x1,y1,x2,y2=map(int,m.groups()); print((x1+x2)//2,(y1+y2)//2); raise SystemExit(0)
+          raise SystemExit('GENERATE button not found')
+          PY
+          read X Y </tmp/tap.txt
+          "$ADB" shell input tap "$X" "$Y"
+          sleep 5
+          test -n "$("$ADB" shell pidof "$PKG" | tr -d '\r')"
+          "$ADB" shell uiautomator dump /sdcard/after.xml >/dev/null
+          "$ADB" pull /sdcard/after.xml /tmp/after.xml >/dev/null
+          grep -q 'text="TOTAL 20' /tmp/after.xml
+          ! grep -q '\[FATAL\] GENERATE' /tmp/after.xml
+          echo RUNTIME_GENERATE_PASS
+
+      - name: Integrity and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=tools/account-factory-android/app/build/outputs/apk/debug/app-debug.apk
+          unzip -t "$APK"
+          sha256sum "$APK" | tee "$APK.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Amir-Account-Factory-Android-v1.3
+          path: |
+            tools/account-factory-android/app/build/outputs/apk/debug/app-debug.apk
+            tools/account-factory-android/app/build/outputs/apk/debug/app-debug.apk.sha256
+            tools/account-factory-android/app/build/reports/tests/testDebugUnitTest/
+            tools/account-factory-android/app/build/reports/lint-results-debug.html
