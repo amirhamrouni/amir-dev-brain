@@ -61,18 +61,11 @@ jobs:
 
           p = root / 'CryptoBox.java'
           s = p.read_text()
-          old = '''            byte[] iv = new byte[12];
-            R.nextBytes(iv);
-            Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
-            c.init(Cipher.ENCRYPT_MODE, key(), new GCMParameterSpec(128, iv));
-            byte[] out = c.doFinal(plain.getBytes(StandardCharsets.UTF_8));'''
-          new = '''            Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
-            c.init(Cipher.ENCRYPT_MODE, key());
-            byte[] iv = c.getIV();
-            byte[] out = c.doFinal(plain.getBytes(StandardCharsets.UTF_8));'''
-          if old not in s:
-              raise SystemExit('CryptoBox encrypt block not found')
-          s = s.replace(old, new)
+          pattern = r'byte\[\]\s+iv\s*=\s*new byte\[12\];\s*R\.nextBytes\(iv\);\s*Cipher\s+c\s*=\s*Cipher\.getInstance\("AES/GCM/NoPadding"\);\s*c\.init\(Cipher\.ENCRYPT_MODE,\s*key\(\),\s*new GCMParameterSpec\(128,\s*iv\)\);\s*byte\[\]\s+out\s*=\s*c\.doFinal\(plain\.getBytes\(StandardCharsets\.UTF_8\)\);'
+          replacement = 'Cipher c = Cipher.getInstance("AES/GCM/NoPadding");\n            c.init(Cipher.ENCRYPT_MODE, key());\n            byte[] iv = c.getIV();\n            byte[] out = c.doFinal(plain.getBytes(StandardCharsets.UTF_8));'
+          s, n = re.subn(pattern, replacement, s, count=1)
+          if n != 1:
+              raise SystemExit('CryptoBox encrypt block patch count=' + str(n))
           p.write_text(s)
 
           p = root / 'MainActivity.java'
