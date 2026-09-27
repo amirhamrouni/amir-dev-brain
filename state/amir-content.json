@@ -20,15 +20,19 @@
   "visual_identity": {
     "format": "9:16 1080x1920",
     "scene_count": 6,
-    "style": "black/gold premium tech",
+    "style": "clean full-screen premium tech",
     "tiktok_handle": "@amir_nederland",
     "instagram_handle": "@amir_hamrouniii",
     "rules": [
-      "full-screen coherent scenes",
-      "large mobile-readable Arabic",
+      "full-screen coherent moving scenes",
+      "NO decorative frame, border, card, phone-frame, picture-frame or boxed scene treatment",
+      "NO preview image, preview card, thumbnail, storyboard panel, contact sheet or screenshot presented as a framed preview",
+      "branding must be lightweight transparent overlays only: small logo/handle/short caption when needed",
+      "the actual scene must occupy the full 9:16 canvas edge-to-edge",
+      "large mobile-readable Arabic only when editorially needed; do not turn the video into a poster",
       "correct RTL shaping",
       "no black/text-only filler",
-      "no visible collage",
+      "no visible collage or multi-panel layout",
       "no generated-text artifacts",
       "actual final-frame QC before publication"
     ]
@@ -38,5 +42,5 @@
     "android-studio|bring-your-own-agent|codex|claude-agent|antigravity|2026-09-26",
     "google|antigravity-sdk|local-ai-agents|gemma-4-26b-a4b|litert|offline|ollama|lm-studio|vllm|2026-09-23"
   ],
-  "next_action": "On the next Amir content cycle, sync this state and Metricool live first, reject semantic duplicates, and choose a new verified AI/app/tool opportunity."
+  "next_action": "On the next Amir content cycle, sync this state and Metricool live first, reject semantic duplicates, choose a new verified AI/app/tool opportunity, and enforce the frameless/no-preview visual identity before rendering."
 }
