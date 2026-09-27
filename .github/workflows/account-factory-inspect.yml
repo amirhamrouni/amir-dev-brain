@@ -1,0 +1,27 @@
+name: Account Factory Inspect
+
+on:
+  push:
+    branches:
+      - build/account-factory-android
+    paths:
+      - '.github/workflows/account-factory-inspect.yml'
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reconstruct and inspect
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf tools/account-factory-android
+          mkdir -p tools/account-factory-android
+          cat tools/account-factory-android-src/part-*.b64 | base64 -d > /tmp/source.zip
+          unzip -q /tmp/source.zip -d tools/account-factory-android
+          python3 .github/scripts/fix_account_factory_runtime.py
+          echo '=== MailTmClient.java ==='
+          sed -n '1,260p' tools/account-factory-android/app/src/main/java/com/amir/accountfactory/MailTmClient.java
+          echo '=== Runner mail-related lines ==='
+          grep -n -E 'createInbox|MailTm|EMAIL|inbox|token|password|runOne|run\(' tools/account-factory-android/app/src/main/java/com/amir/accountfactory/Runner.java || true
