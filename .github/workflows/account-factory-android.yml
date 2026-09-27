@@ -7,12 +7,16 @@ on:
       - build/account-factory-android
     paths:
       - 'tools/account-factory-android-src/**'
+      - 'tools/account-factory-android-patches/**'
       - '.github/workflows/account-factory-android.yml'
 
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
       - uses: actions/checkout@v4
 
@@ -24,15 +28,16 @@ jobs:
           mkdir -p tools/account-factory-android
           cat tools/account-factory-android-src/part-*.b64 | base64 -d > /tmp/account-factory-android-src.zip
           unzip -q /tmp/account-factory-android-src.zip -d tools/account-factory-android
+          if [ -d tools/account-factory-android-patches ]; then
+            rsync -a tools/account-factory-android-patches/ tools/account-factory-android/
+          fi
           test -f tools/account-factory-android/app/build.gradle
           unzip -t /tmp/account-factory-android-src.zip
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-
-      - uses: android-actions/setup-android@v3
 
       - uses: gradle/actions/setup-gradle@v4
         with:
@@ -40,7 +45,12 @@ jobs:
 
       - name: Install Android SDK 36
         shell: bash
-        run: yes | sdkmanager "platforms;android-36" "build-tools;36.0.0" >/dev/null
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Unit tests
         working-directory: tools/account-factory-android
