@@ -21,7 +21,7 @@ jobs:
           cat tools/account-factory-android-src/part-*.b64 | base64 -d > /tmp/source.zip
           unzip -q /tmp/source.zip -d tools/account-factory-android
           python3 .github/scripts/fix_account_factory_runtime.py
-          echo '=== MailTmClient.java ==='
-          sed -n '1,260p' tools/account-factory-android/app/src/main/java/com/amir/accountfactory/MailTmClient.java
-          echo '=== Runner.java 110-215 ==='
-          sed -n '110,215p' tools/account-factory-android/app/src/main/java/com/amir/accountfactory/Runner.java
+          echo '=== Runner.java 1-125 ==='
+          sed -n '1,125p' tools/account-factory-android/app/src/main/java/com/amir/accountfactory/Runner.java
+          echo '=== SelfTest.java ==='
+          sed -n '1,260p' tools/account-factory-android/app/src/main/java/com/amir/accountfactory/SelfTest.java 2>/dev/null || true
