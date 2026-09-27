@@ -7,6 +7,7 @@ on:
       - build/account-factory-android
     paths:
       - '.github/scripts/fix_account_factory_v15.py'
+      - '.github/scripts/fix_account_factory_v15b.py'
       - '.github/workflows/account-factory-v15.yml'
 
 jobs:
@@ -27,7 +28,7 @@ jobs:
           mkdir -p tools/account-factory-android
           cat tools/account-factory-android-src/part-*.b64 | base64 -d > /tmp/source.zip
           unzip -q /tmp/source.zip -d tools/account-factory-android
-          python3 .github/scripts/fix_account_factory_v15.py
+          python3 .github/scripts/fix_account_factory_v15b.py
           python3 - <<'PY'
           from pathlib import Path
           p=Path('tools/account-factory-android/app/build.gradle')
@@ -63,7 +64,7 @@ jobs:
 
       - name: Password regression
         working-directory: tools/account-factory-android
-        run: gradle --no-daemon testDebugUnitTest --tests com.amir.accountfactory.PersonaPasswordPolicyTest
+        run: gradle --no-daemon testDebugUnitTest --tests com.amir.accountfactory.PersonaPasswordPolicyTest --tests com.amir.accountfactory.PersonaGeneratorTest
 
       - name: Mail.tm parser/runtime regression
         working-directory: tools/account-factory-android
