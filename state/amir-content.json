@@ -1,9 +1,21 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "brand": "Amir Hamrouni",
   "metricool_brand_id": 6926406,
   "timezone": "Europe/Amsterdam",
   "completion_contract": "rules/automation-completion-contract.md",
+  "error_memory": "memory/error-ledger.md",
+  "mandatory_preflight": [
+    "read memory/error-ledger.md",
+    "apply relevant prevention gates",
+    "verify brand/account",
+    "verify real-person reference requirements before any Amir image generation"
+  ],
+  "identity_reference_gate": {
+    "rule": "REAL_PERSON_REFERENCE_REQUIRED",
+    "policy": "Never invent Amir's face. For image generation depicting Amir, a usable real Amir photo must be present in the current conversation before generation. Preserve facial identity from that reference.",
+    "failure_action": "Do not generate; request/use the real current-chat reference instead of guessing."
+  },
   "last_cycle_at": "2026-09-26T15:15:00+02:00",
   "last_cycle_status": "SUCCESS_VERIFIED_SCHEDULED_BOTH_NETWORKS",
   "last_cycle_log": "cycles/amir-content/2026-09-26T1515-antigravity-local-ai.json",
@@ -42,5 +54,5 @@
     "android-studio|bring-your-own-agent|codex|claude-agent|antigravity|2026-09-26",
     "google|antigravity-sdk|local-ai-agents|gemma-4-26b-a4b|litert|offline|ollama|lm-studio|vllm|2026-09-23"
   ],
-  "next_action": "On the next Amir content cycle, sync this state and Metricool live first, reject semantic duplicates, choose a new verified AI/app/tool opportunity, and enforce the frameless/no-preview visual identity before rendering."
+  "next_action": "On the next Amir content cycle, read the error ledger first, sync this state and Metricool live, reject semantic duplicates, verify the real-person reference gate before any Amir image generation, and enforce the frameless/no-preview visual identity before rendering."
 }
