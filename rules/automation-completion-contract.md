@@ -2,6 +2,18 @@
 
 Canonical user preference for all scheduled/manual automation workers.
 
+## 0. Mandatory learning loop
+Before substantive work, read `memory/error-ledger.md` plus the domain-specific rules/state. A confirmed user correction or reproducible failure is production evidence and must not die in chat history.
+
+When a new generalizable mistake is confirmed:
+1. identify the mistake and root cause;
+2. fix the current task;
+3. add a durable prevention gate to `memory/error-ledger.md`;
+4. mirror that gate into the relevant worker/rule/state when tools permit;
+5. on later runs, check known failure signatures before inventing a new workaround.
+
+The objective is cumulative quality improvement and preventing repeated mistakes, not pretending errors can never occur.
+
 ## 1. Preserve specialization
 Each worker keeps its own domain and brand. Do not merge responsibilities merely because the execution contract is shared.
 
@@ -53,7 +65,9 @@ For generated visual stories, scenes should be coherent, full-screen, visually r
 Use the canonical Ghaba News repository/rules and Master Logo. Current news Reels use the established six-scene 9:16 production/QC contract and the approved audio rotation/state. Political or contested claims require neutral descriptive wording and attribution.
 
 ### Amir Hamrouni content
-Use Amir identity only. Keep the approved handles/branding for the relevant workflow. If Amir's real reference image is used, preserve facial identity. Voice/narration must be natural and pronunciation-correct; rewrite/diacritize Arabic/Tunisian script when necessary before regenerating audio.
+Use Amir identity only. Keep the approved handles/branding for the relevant workflow. If Amir's real reference image is used, preserve facial identity. Never invent Amir's face. For image generation depicting Amir, a usable real Amir reference image must be available in the current conversation before generation. Voice/narration must be natural and pronunciation-correct; rewrite/diacritize Arabic/Tunisian script when necessary before regenerating audio.
+
+Amir visual identity is frameless/video-first: full-screen edge-to-edge content with light overlays only. Reject decorative borders, cards, phone/picture frames, preview cards/images, storyboard/contact-sheet layouts, and heavy poster/infographic compositions unless the user explicitly requests them.
 
 ### Reposted/ingested Amir Reels
 Never publish the raw file when the workflow requires the Amir overlay/template. Apply the approved brand treatment, safe-area placement, conservative quality enhancement, dedupe, caption, scheduling, and live verification.
@@ -63,5 +77,7 @@ Never infer terminal success from an earlier API response. Read the actual desti
 
 ## 7. Memory/writeback
 When a worker has a canonical repository/state ledger, persist verified fixes, failure signatures, IDs, hashes, publication/deploy status, dedupe fingerprints, and the exact next state. A proven fix becomes a prevention rule so later workers do not repeat the same error.
+
+`memory/error-ledger.md` is the cross-workflow prevention memory. Domain-specific state/rules remain authoritative for implementation details, and important corrections should be mirrored there too.
 
 This contract supplements, not replaces, each worker's domain-specific rules. The stricter domain rule wins when there is a conflict.
