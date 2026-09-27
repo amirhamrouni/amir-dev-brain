@@ -44,7 +44,12 @@ jobs:
           AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
           AVDMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
           EMULATOR="$ANDROID_HOME/emulator/emulator"
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/android-avd"
+          mkdir -p "$ANDROID_AVD_HOME"
           echo no | "$AVDMANAGER" create avd -n AmirFactoryCI -k "system-images;android-35;google_apis;x86_64" --force >/dev/null
+          echo '--- AVD LIST ---'
+          "$AVDMANAGER" list avd
+          test -f "$ANDROID_AVD_HOME/AmirFactoryCI.ini"
           sudo chmod 666 /dev/kvm 2>/dev/null || true
           ACCEL='-accel off'
           if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then ACCEL='-accel on'; fi
