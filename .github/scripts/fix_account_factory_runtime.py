@@ -48,11 +48,13 @@ p = root / 'MailTmClient.java'
 s = p.read_text()
 s = s.replace('JSONObject obj = new JSONObject(r.body);\n        JSONArray rows = array(obj, "hydra:member", "member");', 'JSONArray rows = collection(r.body);')
 array_marker = '''    private static JSONArray array(JSONObject o, String a, String b) {\n        JSONArray x = o.optJSONArray(a); return x != null ? x : (o.optJSONArray(b) != null ? o.optJSONArray(b) : new JSONArray());\n    }'''
-collection_helper = '''    static JSONArray collection(String body) {\n        String s = body == null ? "" : body.trim();\n        if (s.isEmpty()) return new JSONArray();\n        if (s.charAt(0) == '[') return new JSONArray(s);\n        JSONObject obj = new JSONObject(s);\n        return array(obj, "hydra:member", "member");\n    }\n\n''' + array_marker
+collection_helper = '''    static JSONArray collection(String body) throws Exception {\n        String s = body == null ? "" : body.trim();\n        if (s.isEmpty()) return new JSONArray();\n        if (s.charAt(0) == '[') return new JSONArray(s);\n        JSONObject obj = new JSONObject(s);\n        return array(obj, "hydra:member", "member");\n    }\n\n''' + array_marker
 if 'static JSONArray collection(String body)' not in s:
     if array_marker not in s:
         raise SystemExit('MailTmClient array helper marker not found')
     s = s.replace(array_marker, collection_helper)
+else:
+    s = s.replace('static JSONArray collection(String body) {', 'static JSONArray collection(String body) throws Exception {')
 p.write_text(s)
 
 # A phone/CAPTCHA checkpoint during preflight is a checkpoint, not a generic error.
@@ -80,4 +82,4 @@ for p in root.glob('*.java'):
 # Focused parser regression tests for both Mail.tm response shapes.
 t = Path('tools/account-factory-android/app/src/test/java/com/amir/accountfactory/MailTmClientTest.java')
 t.parent.mkdir(parents=True, exist_ok=True)
-t.write_text('''package com.amir.accountfactory;\n\nimport org.junit.Test;\nimport static org.junit.Assert.*;\n\npublic class MailTmClientTest {\n    @Test public void parsesHydraObjectCollection() {\n        String body = "{\\\"hydra:member\\\":[{\\\"domain\\\":\\\"example.test\\\",\\\"isActive\\\":true}]}";\n        assertEquals(1, MailTmClient.collection(body).length());\n    }\n    @Test public void parsesTopLevelArrayCollection() {\n        String body = "[{\\\"domain\\\":\\\"example.test\\\",\\\"isActive\\\":true}]";\n        assertEquals(1, MailTmClient.collection(body).length());\n    }\n}\n''')
+t.write_text('''package com.amir.accountfactory;\n\nimport org.junit.Test;\nimport static org.junit.Assert.*;\n\npublic class MailTmClientTest {\n    @Test public void parsesHydraObjectCollection() throws Exception {\n        String body = "{\\\"hydra:member\\\":[{\\\"domain\\\":\\\"example.test\\\",\\\"isActive\\\":true}]}";\n        assertEquals(1, MailTmClient.collection(body).length());\n    }\n    @Test public void parsesTopLevelArrayCollection() throws Exception {\n        String body = "[{\\\"domain\\\":\\\"example.test\\\",\\\"isActive\\\":true}]";\n        assertEquals(1, MailTmClient.collection(body).length());\n    }\n}\n''')
