@@ -1,4 +1,4 @@
-name: Amir Account Factory v1.5 inspect
+name: Amir Account Factory v1.7 inspect
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Reconstruct current patched source
+      - name: Reconstruct current v1.6-patched source
         shell: bash
         run: |
           set -euo pipefail
@@ -21,12 +21,12 @@ jobs:
           mkdir -p tools/account-factory-android
           cat tools/account-factory-android-src/part-*.b64 | base64 -d > /tmp/source.zip
           unzip -q /tmp/source.zip -d tools/account-factory-android
-          python3 .github/scripts/fix_account_factory_v14.py
+          python3 .github/scripts/fix_account_factory_v16.py
           mkdir -p /tmp/inspect
-          for f in WebAutomation.java Runner.java MailTmClient.java Account.java PersonaGenerator.java FlowEngine.java JsScripts.java AppDb.java AppConfig.java; do
+          for f in WebAutomation.java Runner.java MailTmClient.java OtpUtil.java Account.java PersonaGenerator.java FlowEngine.java JsScripts.java AppDb.java AppConfig.java; do
             cp "tools/account-factory-android/app/src/main/java/com/amir/accountfactory/$f" /tmp/inspect/ 2>/dev/null || true
           done
       - uses: actions/upload-artifact@v4
         with:
-          name: aaf-v15-inspect
+          name: aaf-v17-inspect
           path: /tmp/inspect/
