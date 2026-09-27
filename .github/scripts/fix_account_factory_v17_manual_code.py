@@ -37,18 +37,37 @@ if old not in s:
 s = s.replace(old, new, 1)
 p.write_text(s)
 
-# Keep the verification page open and wait for the owner to enter/confirm the displayed code manually.
+# Keep the verification page open for manual paste/confirm. Remove the obsolete auto-fill fallback entirely.
 p = root / 'FlowEngine.java'
 s = p.read_text()
-old = 'if (web.fillOtp(code)) { listener.onState(state, "email code inserted"); settle(650); web.clickProgress(); settle(2600); continue; }'
-new = '''listener.onState(state, "email code available; enter it and confirm manually");\n                    long manualDeadline = System.currentTimeMillis() + Math.max(180000L, cfg.emailCodeTimeoutSeconds * 1000L);\n                    boolean advanced = false;\n                    while (System.currentTimeMillis() < manualDeadline) {\n                        settle(800);\n                        String u = web.currentUrl().toLowerCase(Locale.ROOT);\n                        String s2 = (u.contains("/signup/email/digit-code") || u.contains("/signup/email/verify")) ? "EMAIL_OTP" : web.detectState();\n                        if (!"EMAIL_OTP".equals(s2)) { listener.onState(s2, "manual confirmation detected; resuming"); advanced = true; break; }\n                    }\n                    if (advanced) continue;\n                    return resultWithDiag(web, account, "EMAIL_OTP_WAITING_CONFIRMATION", state);'''
-if old not in s:
-    raise SystemExit('FlowEngine code marker not found')
-s = s.replace(old, new, 1)
+old_block = '''                    if (web.fillOtp(code)) { listener.onState(state, "email code inserted"); settle(650); web.clickProgress(); settle(2600); continue; }\n                    Result r = resultWithDiag(web, account, "OTP_FIELD_NOT_FOUND", state);\n                    return r;'''
+new_block = '''                    listener.onState(state, "email code available; enter it and confirm manually");\n                    long manualDeadline = System.currentTimeMillis() + Math.max(900000L, cfg.emailCodeTimeoutSeconds * 1000L);\n                    boolean advanced = false;\n                    int manualTicks = 0;\n                    while (System.currentTimeMillis() < manualDeadline) {\n                        settle(800);\n                        if ((manualTicks++ % 10) == 0) web.dismissObstacles(2);\n                        String u = web.currentUrl().toLowerCase(Locale.ROOT);\n                        String s2 = (u.contains("/signup/email/digit-code") || u.contains("/signup/email/verify")) ? "EMAIL_OTP" : web.detectState();\n                        if (!"EMAIL_OTP".equals(s2)) { listener.onState(s2, "manual confirmation detected; resuming"); advanced = true; break; }\n                    }\n                    if (advanced) continue;\n                    return resultWithDiag(web, account, "EMAIL_OTP_WAITING_CONFIRMATION", state);'''
+if old_block not in s:
+    raise SystemExit('FlowEngine OTP block marker not found')
+s = s.replace(old_block, new_block, 1)
+p.write_text(s)
+
+# Surface the captured code in the account list and make the text selectable for easy copy/paste.
+p = root / 'MainActivity.java'
+s = p.read_text()
+s = s.replace('accounts=text("",11,Color.rgb(225,225,230),false); accounts.setPadding(dp(6),dp(4),dp(6),dp(4)); accounts.setTypeface(android.graphics.Typeface.MONOSPACE);',
+              'accounts=text("",11,Color.rgb(225,225,230),false); accounts.setPadding(dp(6),dp(4),dp(6),dp(4)); accounts.setTypeface(android.graphics.Typeface.MONOSPACE); accounts.setTextIsSelectable(true);')
+s = s.replace('logs=text("",10,Color.rgb(210,210,215),false); logs.setTypeface(android.graphics.Typeface.MONOSPACE); logs.setPadding(dp(6),dp(4),dp(6),dp(4));',
+              'logs=text("",10,Color.rgb(210,210,215),false); logs.setTypeface(android.graphics.Typeface.MONOSPACE); logs.setPadding(dp(6),dp(4),dp(6),dp(4)); logs.setTextIsSelectable(true);')
+old_row = '            if(!a.tempEmail.trim().isEmpty())b.append("     ").append(a.tempEmail).append("  @").append(a.handle).append(\'\\n\');\n'
+new_row = '            if(!a.tempEmail.trim().isEmpty())b.append("     ").append(a.tempEmail).append("  @").append(a.handle).append(\'\\n\');\n            if(!a.lastCode.trim().isEmpty())b.append("     EMAIL CODE: ").append(a.lastCode).append("  ← select/copy, paste in browser, then Continue\\n");\n'
+if old_row not in s:
+    raise SystemExit('MainActivity account row marker not found')
+s = s.replace(old_row, new_row, 1)
 p.write_text(s)
 
 # Build-time source contract checks.
+flow = (root / 'FlowEngine.java').read_text()
+main = (root / 'MainActivity.java').read_text()
 assert 'saved plaintext' in (root / 'Runner.java').read_text()
-assert 'email code available; enter it and confirm manually' in (root / 'FlowEngine.java').read_text()
+assert 'email code available; enter it and confirm manually' in flow
 assert 'retryAfter.put(id, now + 5000L)' in (root / 'MailTmClient.java').read_text()
 assert 'v.put("last_code", a.lastCode == null ? "" : a.lastCode)' in (root / 'AppDb.java').read_text()
+assert 'web.fillOtp(code)' not in flow
+assert 'OTP_FIELD_NOT_FOUND' not in flow.split('if ("EMAIL_OTP".equals(state))', 1)[1].split('if ("UNKNOWN".equals(state))', 1)[0]
+assert 'EMAIL CODE: ' in main and 'setTextIsSelectable(true)' in main
