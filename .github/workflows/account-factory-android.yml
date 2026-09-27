@@ -40,7 +40,9 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
+          import re
           root = Path('tools/account-factory-android/app/src/main/java/com/amir/accountfactory')
+
           p = root / 'WebAutomation.java'
           s = p.read_text()
           s = s.replace('Files.writeString(htmlFile.toPath(), html == null ? "" : html, StandardCharsets.UTF_8);',
@@ -56,6 +58,13 @@ jobs:
           s = s.replace('Files.writeString(tp.toPath(),text.toString(),StandardCharsets.UTF_8);',
                         'try (java.io.FileOutputStream out = new java.io.FileOutputStream(tp)) { out.write(text.toString().getBytes(StandardCharsets.UTF_8)); }')
           p.write_text(s)
+
+          # Java core APIs used by the first port but unavailable on minSdk 26.
+          for p in root.glob('*.java'):
+              s = p.read_text()
+              s = s.replace('.isBlank()', '.trim().isEmpty()')
+              s = re.sub(r'Set\.of\((.*?)\)', r'new java.util.HashSet<>(java.util.Arrays.asList(\1))', s, flags=re.S)
+              p.write_text(s)
           PY
 
       - uses: actions/setup-java@v5
