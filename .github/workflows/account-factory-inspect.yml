@@ -23,5 +23,5 @@ jobs:
           python3 .github/scripts/fix_account_factory_runtime.py
           echo '=== MailTmClient.java ==='
           sed -n '1,260p' tools/account-factory-android/app/src/main/java/com/amir/accountfactory/MailTmClient.java
-          echo '=== Runner mail-related lines ==='
-          grep -n -E 'createInbox|MailTm|EMAIL|inbox|token|password|runOne|run\(' tools/account-factory-android/app/src/main/java/com/amir/accountfactory/Runner.java || true
+          echo '=== Runner.java 110-215 ==='
+          sed -n '110,215p' tools/account-factory-android/app/src/main/java/com/amir/accountfactory/Runner.java
