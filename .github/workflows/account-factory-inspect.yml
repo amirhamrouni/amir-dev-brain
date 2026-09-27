@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Reconstruct and inspect TikTok state machine
+      - name: Reconstruct and inspect TikTok OTP flow
         shell: bash
         run: |
           set -euo pipefail
@@ -22,11 +22,7 @@ jobs:
           unzip -q /tmp/source.zip -d tools/account-factory-android
           python3 .github/scripts/fix_account_factory_v14.py
           ROOT=tools/account-factory-android/app/src/main/java/com/amir/accountfactory
-          echo '=== JsScripts.java ==='
-          cat "$ROOT/JsScripts.java"
-          echo '=== WebAutomation.java ==='
-          cat "$ROOT/WebAutomation.java"
-          echo '=== Runner.java ==='
-          cat "$ROOT/Runner.java"
-          echo '=== MailTmClient waitForCode ==='
-          grep -n -A120 -B20 'waitForCode' "$ROOT/MailTmClient.java" || true
+          echo '=== FlowEngine.java ==='
+          cat "$ROOT/FlowEngine.java"
+          echo '=== OtpUtil.java ==='
+          cat "$ROOT/OtpUtil.java"
