@@ -1,0 +1,103 @@
+name: Amir Account Factory Android v1.6
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - build/account-factory-android
+    paths:
+      - '.github/scripts/fix_account_factory_v16.py'
+      - '.github/workflows/account-factory-v16.yml'
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct source and apply v1.6 fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf tools/account-factory-android
+          mkdir -p tools/account-factory-android
+          cat tools/account-factory-android-src/part-*.b64 | base64 -d > /tmp/source.zip
+          unzip -q /tmp/source.zip -d tools/account-factory-android
+          python3 .github/scripts/fix_account_factory_v16.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tools/account-factory-android/app/build.gradle')
+          s=p.read_text()
+          needle="    testImplementation 'junit:junit:4.13.2'"
+          dep="    testImplementation 'org.json:json:20240303'"
+          if dep not in s:
+              if needle not in s: raise SystemExit('JUnit dependency marker missing')
+              s=s.replace(needle, needle+'\n'+dep)
+          p.write_text(s)
+          PY
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.6.0'
+
+      - name: Install Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: TikTok OTP-cookie regression
+        working-directory: tools/account-factory-android
+        run: gradle --no-daemon testDebugUnitTest --tests com.amir.accountfactory.TikTokEmailOtpCookieRegressionTest
+
+      - name: Password regression
+        working-directory: tools/account-factory-android
+        run: gradle --no-daemon testDebugUnitTest --tests com.amir.accountfactory.PersonaPasswordPolicyTest --tests com.amir.accountfactory.PersonaGeneratorTest
+
+      - name: Mail.tm parser and backoff regression
+        working-directory: tools/account-factory-android
+        run: gradle --no-daemon testDebugUnitTest --tests com.amir.accountfactory.MailTmClientTest --tests com.amir.accountfactory.MailTmRuntimeContractTest --tests com.amir.accountfactory.MailTmBackoffPolicyTest
+
+      - name: Mail.tm live auth smoke
+        working-directory: tools/account-factory-android
+        run: gradle --no-daemon testDebugUnitTest --tests com.amir.accountfactory.MailTmLiveTest
+
+      - name: Full unit tests
+        working-directory: tools/account-factory-android
+        run: gradle --no-daemon testDebugUnitTest
+
+      - name: Lint
+        working-directory: tools/account-factory-android
+        run: gradle --no-daemon lintDebug
+
+      - name: Build APK
+        working-directory: tools/account-factory-android
+        run: gradle --no-daemon assembleDebug
+
+      - name: Integrity and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=tools/account-factory-android/app/build/outputs/apk/debug/app-debug.apk
+          unzip -t "$APK"
+          sha256sum "$APK" | tee "$APK.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Amir-Account-Factory-Android-v1.6
+          path: |
+            tools/account-factory-android/app/build/outputs/apk/debug/app-debug.apk
+            tools/account-factory-android/app/build/outputs/apk/debug/app-debug.apk.sha256
+            tools/account-factory-android/app/build/reports/tests/testDebugUnitTest/
+            tools/account-factory-android/app/build/reports/lint-results-debug.html
