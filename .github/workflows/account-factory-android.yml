@@ -77,6 +77,10 @@ jobs:
           sed -n '1,360p' "$ROOT/Runner.java"
           echo '===== AppDb.java ====='
           sed -n '1,300p' "$ROOT/AppDb.java"
+          echo '===== CryptoBox.java ====='
+          cat "$ROOT/CryptoBox.java"
+          echo '===== PersonaGenerator.java ====='
+          cat "$ROOT/PersonaGenerator.java"
 
       - uses: actions/setup-java@v5
         with:
