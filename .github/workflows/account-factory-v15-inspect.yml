@@ -23,11 +23,9 @@ jobs:
           unzip -q /tmp/source.zip -d tools/account-factory-android
           python3 .github/scripts/fix_account_factory_v14.py
           mkdir -p /tmp/inspect
-          cp tools/account-factory-android/app/src/main/java/com/amir/accountfactory/WebAutomation.java /tmp/inspect/
-          cp tools/account-factory-android/app/src/main/java/com/amir/accountfactory/Runner.java /tmp/inspect/
-          cp tools/account-factory-android/app/src/main/java/com/amir/accountfactory/MailTmClient.java /tmp/inspect/
-          cp tools/account-factory-android/app/src/main/java/com/amir/accountfactory/Account.java /tmp/inspect/ 2>/dev/null || true
-          cp tools/account-factory-android/app/src/main/java/com/amir/accountfactory/PersonaGenerator.java /tmp/inspect/
+          for f in WebAutomation.java Runner.java MailTmClient.java Account.java PersonaGenerator.java FlowEngine.java JsScripts.java AppDb.java AppConfig.java; do
+            cp "tools/account-factory-android/app/src/main/java/com/amir/accountfactory/$f" /tmp/inspect/ 2>/dev/null || true
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: aaf-v15-inspect
