@@ -59,7 +59,6 @@ jobs:
                         'try (java.io.FileOutputStream out = new java.io.FileOutputStream(tp)) { out.write(text.toString().getBytes(StandardCharsets.UTF_8)); }')
           p.write_text(s)
 
-          # AndroidKeyStore with randomizedEncryptionRequired=true must generate its own IV.
           p = root / 'CryptoBox.java'
           s = p.read_text()
           old = '''            byte[] iv = new byte[12];
@@ -76,21 +75,12 @@ jobs:
           s = s.replace(old, new)
           p.write_text(s)
 
-          # Generate must never kill the Activity. Surface any future runtime fault in UI + logcat.
           p = root / 'MainActivity.java'
           s = p.read_text()
           s = s.replace('Button generate=button("GENERATE"); generate.setOnClickListener(v->generateBatch());',
                         'Button generate=button("GENERATE"); generate.setOnClickListener(v->safeGenerateBatch());')
           marker = '    private void generateBatch() {'
-          guard = '''    private void safeGenerateBatch() {
-        try { generateBatch(); }
-        catch (Throwable t) {
-            android.util.Log.e("AmirFactory", "GENERATE failed", t);
-            logUi("[FATAL] GENERATE " + t.getClass().getSimpleName() + ": " + String.valueOf(t.getMessage()));
-        }
-    }
-
-'''
+          guard = '    private void safeGenerateBatch() {\n        try { generateBatch(); }\n        catch (Throwable t) {\n            android.util.Log.e("AmirFactory", "GENERATE failed", t);\n            logUi("[FATAL] GENERATE " + t.getClass().getSimpleName() + ": " + String.valueOf(t.getMessage()));\n        }\n    }\n\n'
           if marker not in s:
               raise SystemExit('generateBatch marker not found')
           if 'private void safeGenerateBatch()' not in s:
