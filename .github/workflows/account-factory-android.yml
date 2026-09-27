@@ -34,6 +34,30 @@ jobs:
           test -f tools/account-factory-android/app/build.gradle
           unzip -t /tmp/account-factory-android-src.zip
 
+      - name: Apply Android API compatibility fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path('tools/account-factory-android/app/src/main/java/com/amir/accountfactory')
+          p = root / 'WebAutomation.java'
+          s = p.read_text()
+          s = s.replace('Files.writeString(htmlFile.toPath(), html == null ? "" : html, StandardCharsets.UTF_8);',
+                        'try (FileOutputStream out = new FileOutputStream(htmlFile)) { out.write((html == null ? "" : html).getBytes(StandardCharsets.UTF_8)); }')
+          s = s.replace('Files.writeString(jsonFile.toPath(), meta.toString(2), StandardCharsets.UTF_8);',
+                        'try (FileOutputStream out = new FileOutputStream(jsonFile)) { out.write(meta.toString(2).getBytes(StandardCharsets.UTF_8)); }')
+          p.write_text(s)
+
+          p = root / 'Runner.java'
+          s = p.read_text()
+          s = s.replace('Files.writeString(jp.toPath(),json.toString(2),StandardCharsets.UTF_8);',
+                        'try (java.io.FileOutputStream out = new java.io.FileOutputStream(jp)) { out.write(json.toString(2).getBytes(StandardCharsets.UTF_8)); }')
+          s = s.replace('Files.writeString(tp.toPath(),text.toString(),StandardCharsets.UTF_8);',
+                        'try (java.io.FileOutputStream out = new java.io.FileOutputStream(tp)) { out.write(text.toString().getBytes(StandardCharsets.UTF_8)); }')
+          p.write_text(s)
+          PY
+
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
