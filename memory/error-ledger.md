@@ -63,8 +63,25 @@ Purpose: permanent operational memory for proven mistakes, user corrections, fai
 - Prevention gate: `FRESH_STATE_BEFORE_MUTATION` + `SEMANTIC_DEDUPE`.
 - Affected workers: Ghaba production/scheduled/manual workers.
 
+### ERR-008 — Ghaba news visuals rejected as low-quality/synthetic
+- Date: 2026-09-28
+- Confirmed bad items: `OpenAI / DNS` (uuid `4661829563014006643`), `Karnak / two sacred lakes` (uuid `1977247858116282492`), and `Bangkok floods` (uuid `-1126825553729993065`). The user explicitly rejected these three as unacceptable.
+- Mistake: news items were allowed into the queue with synthetic/illustrative or weak visuals instead of real, story-matched photojournalistic material.
+- Root cause: visual sourcing was treated as a production shortcut rather than an editorial evidence gate.
+- Fix: for Ghaba news, source real event media first, then real person/place/institution/context media, then directly relevant neutral real B-roll. If no acceptable real visual exists, skip the story.
+- Prevention gate: `GHABA_REAL_VISUAL_OR_SKIP`. No AI-generated event/news imagery, no generic or unrelated stock, no cheap infographic/cards, no fake event depiction. Actual final pixels must be inspected before Metricool create.
+- Affected workers: صحفي, Ghaba News production, manual Ghaba cycles.
+
+### ERR-009 — Unauthorized scope expansion / mutation outside the explicit task
+- Date: 2026-09-28
+- Mistake: while executing one Ghaba cycle, the assistant paused/modified other scheduled posts and disabled workers that the user had not asked to change.
+- Root cause: interpreting a new quality rule as permission to retroactively mutate unrelated existing assets and automations.
+- Fix: changes are limited to the exact objects explicitly requested in the current task. Existing schedules, drafts, automations, queues, files, accounts, or other conversations are read-only unless the user explicitly authorizes changing them.
+- Prevention gate: `EXPLICIT_SCOPE_MUTATION_ONLY`. Before any destructive or state-changing action, verify that the exact target is named or unambiguously included in the user's current instruction. Quality rules do not grant retroactive mutation authority.
+- Affected workers: all automations, publishing workers, GitHub/Metricool/Drive actions, browser automation, and manual operational tasks.
+
 ## Correction ingestion rule
-Any direct user correction such as “this is wrong”, “do not do this again”, “use this exact identity”, pronunciation correction, workflow correction, UI correction, account correction, or publishing correction must be evaluated immediately. If it is generalizable or recurrence-sensitive, append it here and mirror it into the relevant worker/rule/state during the same task whenever tools permit.
+Any direct user correction such as “this is wrong”, “do not do this again”, “use this exact identity”, pronunciation correction, workflow correction, UI correction, account correction, publishing correction, or scope/permission correction must be evaluated immediately. If it is generalizable or recurrence-sensitive, append it here and mirror it into the relevant domain brain/rule/state only when that write is within the user's explicit scope.
 
 ## Quality target
 The goal is not to pretend errors will never happen. The goal is that a confirmed error should become progressively harder to repeat because the system gains a durable prevention rule, a QC gate, or both.
