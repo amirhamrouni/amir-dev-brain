@@ -80,6 +80,14 @@ Purpose: permanent operational memory for proven mistakes, user corrections, fai
 - Prevention gate: `EXPLICIT_SCOPE_MUTATION_ONLY`. Before any destructive or state-changing action, verify that the exact target is named or unambiguously included in the user's current instruction. Quality rules do not grant retroactive mutation authority.
 - Affected workers: all automations, publishing workers, GitHub/Metricool/Drive actions, browser automation, and manual operational tasks.
 
+### ERR-010 — OpenAI/DNS story failed factual verification
+- Date: 2026-09-28
+- Mistake: the `OpenAI / DNS` story itself was explicitly marked wrong by the user, not merely visually poor.
+- Root cause: a high-impact technical/security claim reached the queue without a sufficiently strict primary-source fact lock.
+- Fix: for AI/science/technology/security stories, verify the core mechanism, actors, date, scope, and status directly in the primary source before writing or scheduling; corroborate with a strong independent source where available.
+- Prevention gate: `PRIMARY_SOURCE_FACT_LOCK`. If the primary source does not directly support the core claim, or the wording materially overstates/invents the mechanism, SKIP STORY. Do not recycle the rejected OpenAI/DNS caption or source bundle.
+- Affected workers: صحفي, Ghaba News, Amir tech-news content.
+
 ## Correction ingestion rule
 Any direct user correction such as “this is wrong”, “do not do this again”, “use this exact identity”, pronunciation correction, workflow correction, UI correction, account correction, publishing correction, or scope/permission correction must be evaluated immediately. If it is generalizable or recurrence-sensitive, append it here and mirror it into the relevant domain brain/rule/state only when that write is within the user's explicit scope.
 
