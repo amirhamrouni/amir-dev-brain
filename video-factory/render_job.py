@@ -121,6 +121,48 @@ def ffprobe(path: Path):
     return json.loads(result.stdout)
 
 
+def measure_loudness(path: Path):
+    proc = subprocess.run(
+        [
+            "ffmpeg", "-hide_banner", "-nostats", "-i", str(path),
+            "-map", "0:a:0", "-af",
+            "loudnorm=I=-16:TP=-1.5:LRA=7:print_format=json",
+            "-f", "null", "-"
+        ],
+        text=True,
+        capture_output=True,
+    )
+    stderr = proc.stderr or ""
+    matches = re.findall(r"\{\s*\"input_i\".*?\}", stderr, flags=re.S)
+    if not matches:
+        return None
+    try:
+        data = json.loads(matches[-1])
+        return {
+            "integrated_lufs": float(data.get("input_i")),
+            "true_peak_db": float(data.get("input_tp")),
+            "lra_lu": float(data.get("input_lra")),
+        }
+    except Exception:
+        return None
+
+
+def normalize_audio(path: Path, target_lufs=-16.0, true_peak=-1.5, lra=7.0):
+    tmp = path.with_suffix(".normalized.tmp.mp4")
+    cmd = [
+        "ffmpeg", "-y", "-hide_banner", "-loglevel", "warning",
+        "-i", str(path),
+        "-map", "0:v:0", "-map", "0:a:0",
+        "-c:v", "copy",
+        "-af", f"loudnorm=I={target_lufs}:TP={true_peak}:LRA={lra}",
+        "-c:a", "aac", "-b:a", "192k",
+        "-movflags", "+faststart",
+        str(tmp),
+    ]
+    subprocess.run(cmd, check=True)
+    tmp.replace(path)
+
+
 def qc_video(path: Path, preset: dict):
     data = ffprobe(path)
     streams = data.get("streams", [])
@@ -143,12 +185,24 @@ def qc_video(path: Path, preset: dict):
         h = int(video.get("height", 0) or 0)
         if h <= w:
             errors.append(f"video is not portrait: {w}x{h}")
+
+    loudness = measure_loudness(path) if audio else None
+    if qc.get("require_loudness", True) and audio:
+        if not loudness:
+            errors.append("could not measure audio loudness")
+        else:
+            lo = float(qc.get("min_integrated_lufs", -18.0))
+            hi = float(qc.get("max_integrated_lufs", -14.0))
+            value = loudness["integrated_lufs"]
+            if not lo <= value <= hi:
+                errors.append(f"integrated loudness out of range: {value:.2f} LUFS")
+
     return {
         "pass": not errors,
         "errors": errors,
         "duration_seconds": round(duration, 2),
         "video": {"width": video.get("width"), "height": video.get("height"), "codec": video.get("codec_name")} if video else None,
-        "audio": {"codec": audio.get("codec_name")} if audio else None,
+        "audio": {"codec": audio.get("codec_name"), **(loudness or {})} if audio else None,
     }
 
 
@@ -228,6 +282,14 @@ def main():
     slug = re.sub(r"[^A-Za-z0-9._-]+", "-", str(job.get("id") or job.get("title") or "video")).strip("-") or "video"
     output = out_dir / f"{slug}.mp4"
     shutil.copy2(final, output)
+
+    if bool(job.get("normalize_audio", preset.get("normalize_audio", True))):
+        normalize_audio(
+            output,
+            target_lufs=float(job.get("target_lufs", preset.get("target_lufs", -16.0))),
+            true_peak=float(job.get("true_peak_db", preset.get("true_peak_db", -1.5))),
+            lra=float(job.get("target_lra", preset.get("target_lra", 7.0))),
+        )
 
     qc = qc_video(output, preset)
     report = {
