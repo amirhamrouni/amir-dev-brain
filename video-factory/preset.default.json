@@ -1,0 +1,30 @@
+{
+  "language": "ar-TN",
+  "voice": "ar-TN-HediNeural",
+  "voice_rate": 1.02,
+  "voice_volume": 1.0,
+  "aspect": "9:16",
+  "video_count": 1,
+  "clip_duration": 3,
+  "concat_mode": "sequential",
+  "transition_mode": "none",
+  "match_materials_to_script": true,
+  "source": "auto",
+  "bgm_type": "none",
+  "bgm_volume": 0.0,
+  "subtitle_enabled": true,
+  "subtitle_position": "custom",
+  "subtitle_custom_position": 72,
+  "font_name": "NotoSansArabic-Bold.ttf",
+  "font_size": 58,
+  "text_fore_color": "#FFFFFF",
+  "stroke_color": "#000000",
+  "stroke_width": 2.5,
+  "n_threads": 2,
+  "qc": {
+    "min_duration_seconds": 10,
+    "max_duration_seconds": 70,
+    "require_audio": true,
+    "require_portrait": true
+  }
+}
