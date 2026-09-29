@@ -20,11 +20,18 @@
   "text_fore_color": "#FFFFFF",
   "stroke_color": "#000000",
   "stroke_width": 2.5,
+  "normalize_audio": true,
+  "target_lufs": -16.0,
+  "true_peak_db": -1.5,
+  "target_lra": 7.0,
   "n_threads": 2,
   "qc": {
     "min_duration_seconds": 10,
     "max_duration_seconds": 70,
     "require_audio": true,
-    "require_portrait": true
+    "require_portrait": true,
+    "require_loudness": true,
+    "min_integrated_lufs": -18.0,
+    "max_integrated_lufs": -14.0
   }
 }
