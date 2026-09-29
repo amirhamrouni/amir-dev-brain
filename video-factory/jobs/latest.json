@@ -1,0 +1,28 @@
+{
+  "id": "test-ai-daily-001",
+  "title": "3 استعمالات للذكاء الاصطناعي توفر وقتك",
+  "subject": "ثلاث استعمالات عملية للذكاء الاصطناعي في الحياة اليومية",
+  "language": "ar-TN",
+  "script": "أغلب الناس تستعمل الذكاء الاصطناعي للسؤال فقط، وتضيّع أقوى استعمالاته. أولاً، خليه يلخّص لك رسالة طويلة أو ملف في نقاط واضحة خلال ثواني. ثانياً، أعطيه قائمة مهامك وخليه يرتبها حسب الأولوية والوقت المتاح، بدل ما تضيع نصف نهارك تفكر من وين تبدأ. ثالثاً، استعمله قبل أي شراء: أعطيه احتياجاتك وميزانيتك وخليه يقارن المواصفات والمخاطر بدل الإعلانات. الفكرة موش إنه يعمل كل شيء مكانك. الفكرة إنه ينقص عليك الشغل الممل، ويخليك تركز على القرار اللي فعلاً يحتاج مخك.",
+  "terms": [
+    "person using AI laptop",
+    "long email on laptop",
+    "summarizing document screen",
+    "daily task list desk",
+    "calendar productivity planning",
+    "online shopping laptop",
+    "comparing product specifications",
+    "focused person working desk"
+  ],
+  "voice": "ar-TN-HediNeural",
+  "voice_rate": 1.02,
+  "voice_volume": 1.0,
+  "aspect": "9:16",
+  "clip_duration": 3,
+  "source": "auto",
+  "bgm_type": "none",
+  "bgm_volume": 0.0,
+  "subtitle_position": "custom",
+  "subtitle_custom_position": 72,
+  "font_size": 58
+}
